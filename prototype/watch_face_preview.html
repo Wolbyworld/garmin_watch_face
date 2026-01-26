@@ -754,7 +754,7 @@
         }
 
         function drawDate() {
-            const y = 185;
+            const y = 195;  // Moved down slightly for better spacing
 
             const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
             const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
@@ -800,7 +800,9 @@
         }
 
         function drawTime() {
-            const timeY = 280;
+            // Centered vertically between chart (ends ~165) and rings (starts ~343)
+            // Visual center of time should be at ~265
+            const timeY = 300;  // baseline (visual center = 300 - 38 = 262)
 
             const now = new Date();
             let hours = now.getHours();
@@ -862,47 +864,61 @@
         }
 
         function drawStatsRings() {
-            const ringsY = 365;
-            const ringRadius = 22;
-            const ringSpacing = 80;
-            const ringStroke = 4;
+            // Apple Watch style - concentric rings
+            // Positioned to balance with centered time above
+            const ringsX = CENTER;
+            const ringsY = 368;
 
-            // Calculate positions (centered)
-            const ring1X = CENTER - ringSpacing;
-            const ring2X = CENTER;
-            const ring3X = CENTER + ringSpacing;
+            // Three concentric rings - outer to inner
+            const outerRadius = 32;   // Steps (outer)
+            const middleRadius = 24;  // HR (middle)
+            const innerRadius = 16;   // Floors (inner)
+            const ringStroke = 6;
 
-            // HR Ring (left)
-            const hrProgress = Math.min(1, (heartRate - 50) / 130);  // 50-180 range
-            drawStatRing(ring1X, ringsY, ringRadius, ringStroke, hrProgress,
-                currentTheme.hrRing, '♥', heartRate.toString(), 'bpm');
-
-            // Steps Ring (center)
+            // Steps Ring (outer - teal)
             const stepsProgress = Math.min(1, currentSteps / stepGoal);
-            const stepsDisplay = currentSteps >= 1000 ? (currentSteps / 1000).toFixed(1) + 'k' : currentSteps.toString();
-            drawStatRing(ring2X, ringsY, ringRadius, ringStroke, stepsProgress,
-                currentTheme.stepsRing, '👟', stepsDisplay, 'steps');
+            drawConcentricRing(ringsX, ringsY, outerRadius, ringStroke, stepsProgress, currentTheme.stepsRing);
 
-            // Floors Ring (right)
+            // HR Ring (middle - red)
+            const hrProgress = Math.min(1, (heartRate - 50) / 130);
+            drawConcentricRing(ringsX, ringsY, middleRadius, ringStroke, hrProgress, currentTheme.hrRing);
+
+            // Floors Ring (inner - green)
             const floorsProgress = Math.min(1, currentFloors / floorGoal);
-            drawStatRing(ring3X, ringsY, ringRadius, ringStroke, floorsProgress,
-                currentTheme.floorsRing, '↑', currentFloors.toString(), 'floors');
+            drawConcentricRing(ringsX, ringsY, innerRadius, ringStroke, floorsProgress, currentTheme.floorsRing);
 
-            // Move bar below rings
-            const moveBarY = ringsY + 56;
-            const dotSpacing = 8;
-            const moveLevel = 3;
+            // Stats text below rings - tighter spacing to fit safe zone
+            const statsY = ringsY + outerRadius + 15;
 
-            for (let i = 0; i < 5; i++) {
-                const dotX = CENTER - (2 * dotSpacing) + (i * dotSpacing);
-                ctx.beginPath();
-                ctx.arc(dotX, moveBarY, 2.5, 0, Math.PI * 2);
-                ctx.fillStyle = i < moveLevel ? currentTheme.moveBar : currentTheme.moveBarEmpty;
-                ctx.fill();
-            }
+            ctx.font = '500 12px -apple-system, sans-serif';
+            ctx.textAlign = 'center';
+
+            // Steps (left)
+            ctx.fillStyle = currentTheme.stepsRing;
+            const stepsDisplay = currentSteps >= 1000 ? (currentSteps / 1000).toFixed(1) + 'k' : currentSteps.toString();
+            ctx.fillText(stepsDisplay, CENTER - 60, statsY);
+            ctx.font = '400 9px -apple-system, sans-serif';
+            ctx.fillStyle = currentTheme.textDim;
+            ctx.fillText('steps', CENTER - 60, statsY + 12);
+
+            // HR (center)
+            ctx.font = '500 12px -apple-system, sans-serif';
+            ctx.fillStyle = currentTheme.hrRing;
+            ctx.fillText(heartRate.toString(), CENTER, statsY);
+            ctx.font = '400 9px -apple-system, sans-serif';
+            ctx.fillStyle = currentTheme.textDim;
+            ctx.fillText('bpm', CENTER, statsY + 12);
+
+            // Floors (right)
+            ctx.font = '500 12px -apple-system, sans-serif';
+            ctx.fillStyle = currentTheme.floorsRing;
+            ctx.fillText(currentFloors.toString(), CENTER + 60, statsY);
+            ctx.font = '400 9px -apple-system, sans-serif';
+            ctx.fillStyle = currentTheme.textDim;
+            ctx.fillText('floors', CENTER + 60, statsY + 12);
         }
 
-        function drawStatRing(x, y, radius, strokeWidth, progress, color, icon, value, label) {
+        function drawConcentricRing(x, y, radius, strokeWidth, progress, color) {
             const startAngle = -Math.PI / 2;
             const endAngle = startAngle + (Math.PI * 2 * progress);
 
@@ -910,7 +926,7 @@
             ctx.beginPath();
             ctx.arc(x, y, radius, 0, Math.PI * 2);
             const rgb = hexToRgb(color);
-            ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${currentTheme.ringBg})`;
+            ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`;
             ctx.lineWidth = strokeWidth;
             ctx.lineCap = 'round';
             ctx.stroke();
@@ -924,25 +940,6 @@
                 ctx.lineCap = 'round';
                 ctx.stroke();
             }
-
-            // Icon in center
-            ctx.fillStyle = color;
-            ctx.font = '14px -apple-system, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(icon, x, y + 1);
-            ctx.textBaseline = 'alphabetic';
-
-            // Value below ring
-            ctx.fillStyle = currentTheme.timePrimary;
-            ctx.font = '600 14px -apple-system, sans-serif';
-            ctx.fillText(value, x, y + radius + 16);
-
-            // Label below value
-            ctx.fillStyle = currentTheme.textDim;
-            ctx.font = '400 9px -apple-system, sans-serif';
-            ctx.letterSpacing = '0.5px';
-            ctx.fillText(label, x, y + radius + 28);
         }
 
         function roundRect(ctx, x, y, width, height, radius) {
