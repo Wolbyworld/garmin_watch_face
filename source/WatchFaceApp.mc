@@ -8,21 +8,17 @@ class WatchFaceApp extends Application.AppBase {
         AppBase.initialize();
     }
 
-    // Called when the application starts
-    function onStart(state as Dictionary?) as Void {
+    function onStart(state) {
     }
 
-    // Called when the application stops
-    function onStop(state as Dictionary?) as Void {
+    function onStop(state) {
     }
 
-    // Return the initial view and delegate for the watch face
-    function getInitialView() as [Views] or [Views, InputDelegates] {
+    function getInitialView() {
         return [new WatchFaceView(), new WatchFaceDelegate()];
     }
 
-    // Handle settings changes from Garmin Connect Mobile
-    function onSettingsChanged() as Void {
+    function onSettingsChanged() {
         WatchUi.requestUpdate();
     }
 }
