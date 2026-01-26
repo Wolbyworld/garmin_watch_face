@@ -478,36 +478,27 @@
         }
 
         function drawHeader() {
-            // Compact header within safe zone
-            // Layout: "18° Seattle" left-center, "NYC 10:51" right-center, battery icon far right but safe
+            // Centered header layout - all content centered and within safe zone
+            const headerY = 32;
 
-            const headerY = 35;
-            const leftX = SAFE_ZONE_START + 25;  // 65
-            const rightX = SAFE_ZONE_END - 25;   // 389
-
-            // Temperature + Location (left side)
-            ctx.font = '600 18px -apple-system, sans-serif';
+            // Temperature + Location (centered at top)
+            ctx.font = '500 16px -apple-system, sans-serif';
             ctx.fillStyle = currentTheme.timePrimary;
-            ctx.textAlign = 'left';
-            ctx.fillText('18°', leftX, headerY);
+            ctx.textAlign = 'center';
+            ctx.fillText('18° Seattle', CENTER, headerY);
 
-            ctx.font = '400 14px -apple-system, sans-serif';
-            ctx.fillStyle = currentTheme.textPrimary;
-            ctx.fillText('Seattle', leftX + 38, headerY);
-
-            // Second timezone (right side)
+            // Second timezone (left of center, smaller)
             const now = new Date();
             let tz2Hours = (now.getHours() + timezone2Offset + 24) % 24;
             const tz2Mins = now.getMinutes().toString().padStart(2, '0');
-            ctx.font = '400 12px -apple-system, sans-serif';
-            ctx.fillStyle = currentTheme.textSecondary;
-            ctx.textAlign = 'right';
-            ctx.fillText(`${timezone2Name} ${tz2Hours}:${tz2Mins}`, rightX - 35, headerY);
-
-            // Battery (far right, small)
             ctx.font = '400 11px -apple-system, sans-serif';
             ctx.fillStyle = currentTheme.textDim;
-            ctx.fillText('85%', rightX, headerY);
+            ctx.textAlign = 'left';
+            ctx.fillText(`${timezone2Name} ${tz2Hours}:${tz2Mins}`, SAFE_ZONE_START + 20, headerY);
+
+            // Battery (right side, small)
+            ctx.textAlign = 'right';
+            ctx.fillText('85%', SAFE_ZONE_END - 20, headerY);
         }
 
         function drawWeatherChart() {
@@ -763,7 +754,7 @@
         }
 
         function drawDate() {
-            const y = 182;
+            const y = 185;
 
             const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
             const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
@@ -776,26 +767,40 @@
             const startOfYear = new Date(now.getFullYear(), 0, 1);
             const weekNum = Math.ceil((((now - startOfYear) / 86400000) + startOfYear.getDay() + 1) / 7);
 
-            ctx.font = '400 14px -apple-system, sans-serif';
-            ctx.fillStyle = currentTheme.textPrimary;
-            ctx.textAlign = 'center';
-            ctx.fillText(`${dayName} ${date} ${month}`, CENTER - 12, y);
+            // Date string
+            const dateStr = `${dayName} ${date} ${month}`;
+            ctx.font = '400 15px -apple-system, sans-serif';
+            const dateWidth = ctx.measureText(dateStr).width;
 
-            // Week badge
-            const badgeX = CENTER + 38;
-            const badgeY = y - 10;
+            // Week badge width
+            const badgeWidth = 22;
+            const badgeGap = 8;
+
+            // Total width for centering
+            const totalWidth = dateWidth + badgeGap + badgeWidth;
+            const startX = CENTER - (totalWidth / 2);
+
+            // Draw date text
+            ctx.fillStyle = currentTheme.textPrimary;
+            ctx.textAlign = 'left';
+            ctx.fillText(dateStr, startX, y);
+
+            // Week badge (right of date)
+            const badgeX = startX + dateWidth + badgeGap;
+            const badgeY = y - 11;
 
             ctx.fillStyle = currentTheme.weekBadge;
-            roundRect(ctx, badgeX, badgeY, 20, 14, 3);
+            roundRect(ctx, badgeX, badgeY, badgeWidth, 15, 3);
             ctx.fill();
 
             ctx.font = '600 10px -apple-system, sans-serif';
             ctx.fillStyle = '#000000';
-            ctx.fillText(weekNum.toString(), badgeX + 10, y - 1);
+            ctx.textAlign = 'center';
+            ctx.fillText(weekNum.toString(), badgeX + badgeWidth/2, y);
         }
 
         function drawTime() {
-            const timeY = 270;
+            const timeY = 280;
 
             const now = new Date();
             let hours = now.getHours();
@@ -808,26 +813,29 @@
 
             const timeStr = `${hours}:${minutes.toString().padStart(2, '0')}`;
 
-            // Measure for true centering
-            ctx.font = '300 95px -apple-system, sans-serif';
+            // TRUE CENTER - measure and center the time string exactly
+            ctx.font = '250 100px -apple-system, sans-serif';
             const metrics = ctx.measureText(timeStr);
             const timeWidth = metrics.width;
+
+            // Center the time perfectly
             const timeX = CENTER - (timeWidth / 2);
 
-            const digitHeight = 72;
+            const digitHeight = 76;
             const baselineY = timeY;
             const topY = baselineY - digitHeight;
 
             const fillHeight = digitHeight * stepProgress;
             const fillY = baselineY - fillHeight;
 
-            // Unfilled portion (top)
+            // Unfilled portion (top) - darker for more contrast
             ctx.save();
             ctx.beginPath();
             ctx.rect(0, topY - 20, SCREEN_SIZE, fillY - topY + 20);
             ctx.clip();
             ctx.fillStyle = currentTheme.timeUnfilled;
-            ctx.fillText(timeStr, timeX, timeY);
+            ctx.textAlign = 'center';
+            ctx.fillText(timeStr, CENTER, timeY);
             ctx.restore();
 
             // Filled portion (bottom)
@@ -836,26 +844,27 @@
             ctx.rect(0, fillY, SCREEN_SIZE, fillHeight + 20);
             ctx.clip();
             ctx.fillStyle = currentTheme.timeFill;
-            ctx.fillText(timeStr, timeX, timeY);
+            ctx.textAlign = 'center';
+            ctx.fillText(timeStr, CENTER, timeY);
             ctx.restore();
 
-            // AM/PM and seconds (right of time)
-            const rightEdge = timeX + timeWidth + 6;
-
-            ctx.font = '400 16px -apple-system, sans-serif';
+            // AM/PM - smaller, positioned as superscript to the right
+            ctx.font = '400 18px -apple-system, sans-serif';
             ctx.fillStyle = currentTheme.textSecondary;
             ctx.textAlign = 'left';
-            ctx.fillText(isPM ? 'PM' : 'AM', rightEdge, timeY - 52);
+            const ampmX = CENTER + (timeWidth / 2) + 8;
+            ctx.fillText(isPM ? 'PM' : 'AM', ampmX, timeY - 58);
 
-            ctx.font = '300 20px -apple-system, sans-serif';
-            ctx.fillStyle = currentTheme.textSecondary;
-            ctx.fillText(seconds.toString().padStart(2, '0'), rightEdge, timeY - 28);
+            // Seconds - below AM/PM
+            ctx.font = '300 24px -apple-system, sans-serif';
+            ctx.fillStyle = currentTheme.textPrimary;
+            ctx.fillText(seconds.toString().padStart(2, '0'), ampmX, timeY - 30);
         }
 
         function drawStatsRings() {
-            const ringsY = 355;
-            const ringRadius = 20;
-            const ringSpacing = 75;
+            const ringsY = 365;
+            const ringRadius = 22;
+            const ringSpacing = 80;
             const ringStroke = 4;
 
             // Calculate positions (centered)
@@ -880,14 +889,14 @@
                 currentTheme.floorsRing, '↑', currentFloors.toString(), 'floors');
 
             // Move bar below rings
-            const moveBarY = ringsY + 52;
-            const dotSpacing = 10;
+            const moveBarY = ringsY + 56;
+            const dotSpacing = 8;
             const moveLevel = 3;
 
             for (let i = 0; i < 5; i++) {
                 const dotX = CENTER - (2 * dotSpacing) + (i * dotSpacing);
                 ctx.beginPath();
-                ctx.arc(dotX, moveBarY, 3, 0, Math.PI * 2);
+                ctx.arc(dotX, moveBarY, 2.5, 0, Math.PI * 2);
                 ctx.fillStyle = i < moveLevel ? currentTheme.moveBar : currentTheme.moveBarEmpty;
                 ctx.fill();
             }
@@ -903,6 +912,7 @@
             const rgb = hexToRgb(color);
             ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${currentTheme.ringBg})`;
             ctx.lineWidth = strokeWidth;
+            ctx.lineCap = 'round';
             ctx.stroke();
 
             // Progress arc
@@ -917,21 +927,22 @@
 
             // Icon in center
             ctx.fillStyle = color;
-            ctx.font = '12px -apple-system, sans-serif';
+            ctx.font = '14px -apple-system, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(icon, x, y);
+            ctx.fillText(icon, x, y + 1);
             ctx.textBaseline = 'alphabetic';
 
             // Value below ring
-            ctx.fillStyle = currentTheme.textPrimary;
-            ctx.font = '600 13px -apple-system, sans-serif';
-            ctx.fillText(value, x, y + radius + 14);
+            ctx.fillStyle = currentTheme.timePrimary;
+            ctx.font = '600 14px -apple-system, sans-serif';
+            ctx.fillText(value, x, y + radius + 16);
 
             // Label below value
             ctx.fillStyle = currentTheme.textDim;
             ctx.font = '400 9px -apple-system, sans-serif';
-            ctx.fillText(label, x, y + radius + 26);
+            ctx.letterSpacing = '0.5px';
+            ctx.fillText(label, x, y + radius + 28);
         }
 
         function roundRect(ctx, x, y, width, height, radius) {
