@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<strings>
+    <string id="AppName">OLED Weather</string>
+    <string id="tempUnit">Temperature Unit</string>
+    <string id="celsius">Celsius</string>
+    <string id="fahrenheit">Fahrenheit</string>
+    <string id="clockFormat">Clock Format</string>
+    <string id="format12h">12 Hour</string>
+    <string id="format24h">24 Hour</string>
+    <string id="secondTz">Second Timezone</string>
+    <string id="secondTzName">Timezone Name</string>
+    <string id="secondTzOffset">Timezone Offset</string>
+    <string id="theme">Theme</string>
+    <string id="themeDark">Dark</string>
+    <string id="themeWarm">Warm</string>
+    <string id="themeCool">Cool</string>
+</strings>

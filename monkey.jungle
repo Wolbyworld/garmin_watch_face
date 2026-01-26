@@ -1,0 +1,17 @@
+# Garmin OLED Weather Watch Face
+# Build configuration for Connect IQ
+
+project.manifest = manifest.xml
+
+# Source files
+base.sourcePath = source
+
+# Resources
+base.resourcePath = resources
+
+# Device-specific overrides for different screen sizes
+# Fenix 8 47mm: 454x454
+fenix847mm.resourcePath = $(fenix847mm.resourcePath);resources-fenix8
+
+# Optimization settings
+base.excludeAnnotations = debug

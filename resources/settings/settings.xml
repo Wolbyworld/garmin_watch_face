@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<settings>
+    <setting propertyKey="@Properties.secondTimezoneName" title="@Strings.secondTzName">
+        <settingConfig type="alphaNumeric" maxLength="4" />
+    </setting>
+    <setting propertyKey="@Properties.secondTimezoneOffset" title="@Strings.secondTzOffset">
+        <settingConfig type="numeric" min="-12" max="14" />
+    </setting>
+</settings>
