@@ -94,12 +94,13 @@
             width: 150px;
         }
 
-        .control-group select {
+        .control-group select, .control-group input[type="text"] {
             background: #2a2a2a;
             color: #fff;
             border: 1px solid #3a3a3a;
             padding: 5px 10px;
             border-radius: 5px;
+            width: 100%;
         }
 
         .color-legend {
@@ -124,34 +125,9 @@
             border-radius: 3px;
         }
 
-        .comparison {
-            margin-top: 40px;
-            display: flex;
-            gap: 40px;
-            align-items: flex-start;
-        }
-
-        .comparison-item {
-            text-align: center;
-        }
-
-        .comparison-item h3 {
-            color: #707070;
-            font-size: 12px;
-            margin-bottom: 10px;
-            font-weight: normal;
-        }
-
-        .comparison-item img {
-            width: 200px;
-            height: 200px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-
         .info-panel {
             margin-top: 30px;
-            max-width: 600px;
+            max-width: 700px;
             background: rgba(255,255,255,0.03);
             padding: 20px;
             border-radius: 10px;
@@ -201,6 +177,12 @@
                 <option value="mono">Monochrome</option>
             </select>
         </div>
+        <div class="control-group">
+            <label>Second Timezone</label>
+            <input type="text" id="timezone2" value="NYC" maxlength="4">
+            <input type="range" id="tzOffset" min="-12" max="12" value="-3">
+            <span id="tzOffsetValue">-3h</span>
+        </div>
     </div>
 
     <div class="color-legend">
@@ -213,7 +195,11 @@
             <span>Precipitation</span>
         </div>
         <div class="legend-item">
-            <div class="legend-swatch" style="background: rgba(255,255,255,0.4);"></div>
+            <div class="legend-swatch" style="background: #EF5350;"></div>
+            <span>Wind Speed</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-swatch" style="background: rgba(255,255,255,0.5);"></div>
             <span>Cloud Cover</span>
         </div>
         <div class="legend-item">
@@ -224,20 +210,17 @@
             <div class="legend-swatch" style="background: #26A69A;"></div>
             <span>Step Fill</span>
         </div>
-        <div class="legend-item">
-            <div class="legend-swatch" style="background: #E57373;"></div>
-            <span>Heart Rate</span>
-        </div>
     </div>
 
     <div class="info-panel">
-        <h3>Design Principles Applied</h3>
+        <h3>Updates in This Version</h3>
         <ul>
-            <li><strong>True Black Background</strong> — Every black pixel is OFF on OLED, saving battery</li>
-            <li><strong>Catmull-Rom Smoothed Curve</strong> — Temperature line is mathematically smoothed, not jagged</li>
-            <li><strong>Opacity-Based Clouds</strong> — Cloud density shown via transparency, not hatching</li>
-            <li><strong>Step Goal Fill Effect</strong> — Time digits fill from bottom as you walk</li>
-            <li><strong>Glanceable Design</strong> — Full 72-hour forecast readable in < 2 seconds</li>
+            <li><strong>Step Fill Effect</strong> — Time digits fill from bottom up (unfilled=dim, filled=teal)</li>
+            <li><strong>Wind Speed Line</strong> — Red line showing wind patterns across forecast</li>
+            <li><strong>Fixed Cloud Cover</strong> — Semi-transparent cloud shapes now render properly</li>
+            <li><strong>Second Timezone</strong> — Shows alternate city time (configurable)</li>
+            <li><strong>Better Stats Layout</strong> — HR and floors now properly positioned with icons</li>
+            <li><strong>More Spacing</strong> — Increased gap between chart and time display</li>
         </ul>
     </div>
 
@@ -250,85 +233,105 @@
             dark: {
                 bg: '#000000',
                 timePrimary: '#FFFFFF',
+                timeUnfilled: '#303030',
                 timeFill: '#26A69A',
                 textPrimary: '#B0B0B0',
                 textSecondary: '#707070',
                 textDim: '#505050',
                 tempCurve: '#FFB347',
-                tempFill: 'rgba(255, 179, 71, 0.25)',
+                tempFill: 'rgba(255, 179, 71, 0.2)',
                 precipitation: '#4DD0E1',
-                cloudCover: 'rgba(255, 255, 255, 0.35)',
+                windSpeed: '#EF5350',
+                cloudCover: 'rgba(255, 255, 255, 0.5)',
                 nightSky: '#0A1628',
-                daySky: '#1A3050',
+                daySky: '#1E4D6B',
                 hrIcon: '#E57373',
                 moveBar: '#C62828',
+                moveBarEmpty: '#2A2A2A',
                 weekBadge: '#FF8A65',
-                nowLine: '#FFFFFF'
+                nowLine: '#FFFFFF',
+                floorIcon: '#81C784'
             },
             warm: {
                 bg: '#000000',
                 timePrimary: '#FFE4C4',
+                timeUnfilled: '#2A2018',
                 timeFill: '#FF8A65',
                 textPrimary: '#D4A574',
                 textSecondary: '#8B7355',
                 textDim: '#5C4A3A',
                 tempCurve: '#FF7043',
-                tempFill: 'rgba(255, 112, 67, 0.25)',
+                tempFill: 'rgba(255, 112, 67, 0.2)',
                 precipitation: '#FFAB91',
-                cloudCover: 'rgba(255, 224, 178, 0.3)',
+                windSpeed: '#FF5722',
+                cloudCover: 'rgba(255, 224, 178, 0.4)',
                 nightSky: '#1A0F0A',
-                daySky: '#2D1F1A',
+                daySky: '#3D2517',
                 hrIcon: '#FF8A80',
                 moveBar: '#D84315',
+                moveBarEmpty: '#2A2018',
                 weekBadge: '#FFAB91',
-                nowLine: '#FFE4C4'
+                nowLine: '#FFE4C4',
+                floorIcon: '#FFB74D'
             },
             cool: {
                 bg: '#000000',
                 timePrimary: '#E0F7FA',
+                timeUnfilled: '#0A1A20',
                 timeFill: '#00ACC1',
                 textPrimary: '#80DEEA',
                 textSecondary: '#4DD0E1',
-                textDim: '#26C6DA',
+                textDim: '#1A4A5A',
                 tempCurve: '#4FC3F7',
-                tempFill: 'rgba(79, 195, 247, 0.25)',
+                tempFill: 'rgba(79, 195, 247, 0.2)',
                 precipitation: '#81D4FA',
-                cloudCover: 'rgba(224, 247, 250, 0.3)',
+                windSpeed: '#29B6F6',
+                cloudCover: 'rgba(224, 247, 250, 0.4)',
                 nightSky: '#0A1A28',
-                daySky: '#0D3B50',
+                daySky: '#0D4D6B',
                 hrIcon: '#4DD0E1',
                 moveBar: '#00838F',
+                moveBarEmpty: '#0A1A20',
                 weekBadge: '#4DD0E1',
-                nowLine: '#E0F7FA'
+                nowLine: '#E0F7FA',
+                floorIcon: '#26C6DA'
             },
             mono: {
                 bg: '#000000',
                 timePrimary: '#FFFFFF',
+                timeUnfilled: '#202020',
                 timeFill: '#808080',
                 textPrimary: '#B0B0B0',
                 textSecondary: '#707070',
-                textDim: '#505050',
+                textDim: '#404040',
                 tempCurve: '#CCCCCC',
-                tempFill: 'rgba(200, 200, 200, 0.2)',
-                precipitation: '#909090',
-                cloudCover: 'rgba(255, 255, 255, 0.25)',
-                nightSky: '#0A0A0A',
+                tempFill: 'rgba(200, 200, 200, 0.15)',
+                precipitation: '#808080',
+                windSpeed: '#909090',
+                cloudCover: 'rgba(255, 255, 255, 0.3)',
+                nightSky: '#080808',
                 daySky: '#1A1A1A',
-                hrIcon: '#A0A0A0',
+                hrIcon: '#909090',
                 moveBar: '#606060',
-                weekBadge: '#808080',
-                nowLine: '#FFFFFF'
+                moveBarEmpty: '#202020',
+                weekBadge: '#707070',
+                nowLine: '#FFFFFF',
+                floorIcon: '#707070'
             }
         };
 
         let currentTheme = themes.dark;
         let stepProgress = 0.65;
         let currentHour = 13;
+        let timezone2Name = 'NYC';
+        let timezone2Offset = -3;
 
         // Generate mock weather data
         function generateWeatherData() {
             const data = [];
             const baseTemp = 18;
+            const baseWind = 12;
+
             for (let i = 0; i < 72; i++) {
                 const hour = (currentHour + i) % 24;
                 const dayOffset = Math.floor((currentHour + i) / 24);
@@ -340,18 +343,25 @@
 
                 // Precipitation - some rain periods
                 let precip = 0;
-                if ((i > 8 && i < 16) || (i > 35 && i < 42)) {
-                    precip = Math.random() * 80 + 20;
+                if ((i > 8 && i < 18) || (i > 38 && i < 48)) {
+                    precip = 30 + Math.random() * 60;
                 }
 
-                // Cloud cover
-                let clouds = 20 + Math.random() * 30;
-                if (precip > 0) clouds = 60 + Math.random() * 40;
+                // Cloud cover - correlates with precipitation but also independent
+                let clouds = 15 + Math.random() * 25;
+                if (precip > 0) {
+                    clouds = 70 + Math.random() * 30;
+                } else if (i > 5 && i < 10) {
+                    clouds = 50 + Math.random() * 30;
+                } else if (i > 25 && i < 35) {
+                    clouds = 40 + Math.random() * 35;
+                }
 
-                // Wind
-                const wind = 5 + Math.random() * 25;
+                // Wind speed - varies throughout
+                const windVariation = Math.sin(i * 0.3) * 8 + Math.sin(i * 0.1) * 5;
+                const wind = baseWind + windVariation + (Math.random() - 0.5) * 4;
 
-                data.push({ hour, temp, precip, clouds, wind, dayOffset });
+                data.push({ hour, temp, precip, clouds, wind: Math.max(0, wind), dayOffset });
             }
             return data;
         }
@@ -368,6 +378,24 @@
                 (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
                 (-p0 + 3 * p1 - 3 * p2 + p3) * t3
             );
+        }
+
+        function smoothCurve(points) {
+            const smoothPoints = [];
+            for (let i = 0; i < points.length - 1; i++) {
+                const p0 = points[Math.max(0, i - 1)];
+                const p1 = points[i];
+                const p2 = points[Math.min(points.length - 1, i + 1)];
+                const p3 = points[Math.min(points.length - 1, i + 2)];
+
+                for (let t = 0; t < 1; t += 0.2) {
+                    smoothPoints.push({
+                        x: catmullRom(p0.x, p1.x, p2.x, p3.x, t),
+                        y: catmullRom(p0.y, p1.y, p2.y, p3.y, t)
+                    });
+                }
+            }
+            return smoothPoints;
         }
 
         function drawWatch() {
@@ -397,162 +425,191 @@
         }
 
         function drawHeader() {
+            const centerX = 227;
+
             // Temperature and location
-            ctx.font = '600 24px -apple-system, sans-serif';
+            ctx.font = '600 22px -apple-system, sans-serif';
             ctx.fillStyle = currentTheme.timePrimary;
             ctx.textAlign = 'left';
-            ctx.fillText('18°', 45, 42);
+            ctx.fillText('18°', 55, 38);
 
-            ctx.font = '400 18px -apple-system, sans-serif';
+            ctx.font = '400 16px -apple-system, sans-serif';
             ctx.fillStyle = currentTheme.textPrimary;
-            ctx.fillText('Seattle', 85, 42);
+            ctx.fillText('Seattle', 95, 38);
+
+            // Second timezone
+            const now = new Date();
+            let tz2Hours = (now.getHours() + timezone2Offset + 24) % 24;
+            const tz2Mins = now.getMinutes().toString().padStart(2, '0');
+            ctx.font = '400 14px -apple-system, sans-serif';
+            ctx.fillStyle = currentTheme.textSecondary;
+            ctx.textAlign = 'right';
+            ctx.fillText(`${timezone2Name} ${tz2Hours}:${tz2Mins}`, 345, 38);
 
             // Battery
-            ctx.font = '400 14px -apple-system, sans-serif';
+            ctx.font = '400 12px -apple-system, sans-serif';
             ctx.fillStyle = currentTheme.textDim;
-            ctx.textAlign = 'right';
-            ctx.fillText('85%', 410, 42);
+            ctx.fillText('85%', 400, 38);
 
             // Battery icon
             ctx.strokeStyle = currentTheme.textDim;
             ctx.lineWidth = 1;
-            ctx.strokeRect(370, 32, 16, 10);
-            ctx.fillRect(386, 35, 2, 4);
+            ctx.strokeRect(370, 30, 14, 8);
+            ctx.fillRect(384, 32, 2, 4);
             ctx.fillStyle = currentTheme.textDim;
-            ctx.fillRect(372, 34, 10, 6);
+            ctx.fillRect(372, 32, 9, 4);
         }
 
         function drawWeatherChart() {
-            const chartX = 27;
-            const chartY = 60;
-            const chartWidth = 400;
-            const chartHeight = 140;
+            const chartX = 30;
+            const chartY = 52;
+            const chartWidth = 394;
+            const chartHeight = 130;
 
-            // Find temp range
+            // Find temp and wind ranges
             const temps = weatherData.map(d => d.temp);
+            const winds = weatherData.map(d => d.wind);
             const minTemp = Math.min(...temps);
             const maxTemp = Math.max(...temps);
             const tempRange = Math.max(maxTemp - minTemp, 10);
+            const maxWind = Math.max(...winds);
+            const windRange = Math.max(maxWind, 25);
 
-            // Layer 1: Day/Night band (bottom)
-            const bandY = chartY + chartHeight - 10;
-            const bandHeight = 10;
+            // Layer 1: Day/Night band (at bottom)
+            const bandY = chartY + chartHeight - 8;
+            const bandHeight = 8;
 
             for (let i = 0; i < chartWidth; i++) {
                 const dataIndex = Math.floor(i / chartWidth * 72);
                 const hour = weatherData[dataIndex].hour;
 
-                // Simple day/night: 6-18 is day
-                let color;
-                if (hour >= 6 && hour < 18) {
-                    const dayProgress = (hour - 6) / 12;
-                    const intensity = Math.sin(dayProgress * Math.PI);
-                    color = lerpColor(currentTheme.nightSky, currentTheme.daySky, intensity);
-                } else {
-                    color = currentTheme.nightSky;
+                let intensity = 0;
+                if (hour >= 6 && hour < 20) {
+                    const dayProgress = (hour - 6) / 14;
+                    intensity = Math.sin(dayProgress * Math.PI);
                 }
 
+                const color = lerpColor(currentTheme.nightSky, currentTheme.daySky, intensity);
                 ctx.fillStyle = color;
                 ctx.fillRect(chartX + i, bandY, 1, bandHeight);
             }
 
-            // Layer 2: Cloud cover
-            ctx.fillStyle = currentTheme.cloudCover;
-            const cloudY = chartY + 5;
-            const cloudHeight = 25;
+            // Layer 2: Cloud cover (semi-transparent shapes at top)
+            const cloudY = chartY;
+            const cloudMaxHeight = 22;
 
-            let inCloud = false;
-            let cloudStart = 0;
+            // Group consecutive cloudy hours into cloud shapes
+            let cloudStart = -1;
+            let cloudOpacity = 0;
 
             for (let i = 0; i <= 72; i++) {
                 const clouds = i < 72 ? weatherData[i].clouds : 0;
                 const x = chartX + (i / 72) * chartWidth;
 
-                if (clouds > 40 && !inCloud) {
-                    inCloud = true;
+                if (clouds > 35 && cloudStart === -1) {
                     cloudStart = x;
-                } else if ((clouds <= 40 || i === 72) && inCloud) {
-                    inCloud = false;
+                    cloudOpacity = clouds / 100;
+                } else if (clouds > 35 && cloudStart !== -1) {
+                    cloudOpacity = Math.max(cloudOpacity, clouds / 100);
+                } else if ((clouds <= 35 || i === 72) && cloudStart !== -1) {
+                    // Draw cloud shape
                     const cloudWidth = x - cloudStart;
 
-                    // Draw organic cloud shape
+                    ctx.fillStyle = `rgba(255, 255, 255, ${cloudOpacity * 0.5})`;
                     ctx.beginPath();
-                    ctx.moveTo(cloudStart, cloudY + cloudHeight);
 
-                    // Top curve
-                    const segments = Math.max(3, Math.floor(cloudWidth / 20));
-                    for (let j = 0; j <= segments; j++) {
-                        const cx = cloudStart + (cloudWidth * j / segments);
-                        const variance = Math.sin(j * 1.5) * 8 + Math.random() * 4;
-                        const cy = cloudY + variance;
+                    // Bottom edge
+                    ctx.moveTo(cloudStart, cloudY + cloudMaxHeight);
+
+                    // Create bumpy top edge
+                    const bumps = Math.max(3, Math.floor(cloudWidth / 25));
+                    for (let j = 0; j <= bumps; j++) {
+                        const bx = cloudStart + (cloudWidth * j / bumps);
+                        const heightVar = Math.sin(j * 2.1 + cloudStart * 0.1) * 6 + 4;
+                        const by = cloudY + heightVar;
+
                         if (j === 0) {
-                            ctx.lineTo(cx, cy);
+                            ctx.lineTo(bx, by);
                         } else {
-                            ctx.lineTo(cx, cy);
+                            // Use quadratic curves for smooth bumps
+                            const prevX = cloudStart + (cloudWidth * (j - 1) / bumps);
+                            const cpX = (prevX + bx) / 2;
+                            const cpY = cloudY + Math.sin((j - 0.5) * 2.1 + cloudStart * 0.1) * 8 + 2;
+                            ctx.quadraticCurveTo(cpX, cpY, bx, by);
                         }
                     }
 
-                    ctx.lineTo(x, cloudY + cloudHeight);
+                    ctx.lineTo(x, cloudY + cloudMaxHeight);
                     ctx.closePath();
                     ctx.fill();
+
+                    cloudStart = -1;
                 }
             }
 
             // Layer 3: Temperature curve with gradient fill
-            const tempY = chartY + 35;
-            const tempHeight = 55;
+            const tempY = chartY + 25;
+            const tempHeight = 50;
 
-            // Build smooth curve points
-            const curvePoints = [];
+            const tempPoints = [];
             for (let i = 0; i < 72; i++) {
                 const x = chartX + (i / 72) * chartWidth;
                 const normalizedTemp = (weatherData[i].temp - minTemp) / tempRange;
                 const y = tempY + tempHeight - (normalizedTemp * tempHeight);
-                curvePoints.push({ x, y });
+                tempPoints.push({ x, y });
             }
 
-            // Smooth the curve using Catmull-Rom
-            const smoothPoints = [];
-            for (let i = 0; i < curvePoints.length - 1; i++) {
-                const p0 = curvePoints[Math.max(0, i - 1)];
-                const p1 = curvePoints[i];
-                const p2 = curvePoints[Math.min(curvePoints.length - 1, i + 1)];
-                const p3 = curvePoints[Math.min(curvePoints.length - 1, i + 2)];
+            const smoothTempPoints = smoothCurve(tempPoints);
 
-                for (let t = 0; t < 1; t += 0.25) {
-                    smoothPoints.push({
-                        x: catmullRom(p0.x, p1.x, p2.x, p3.x, t),
-                        y: catmullRom(p0.y, p1.y, p2.y, p3.y, t)
-                    });
-                }
-            }
-
-            // Draw gradient fill under curve
-            const gradient = ctx.createLinearGradient(0, tempY, 0, tempY + tempHeight);
-            gradient.addColorStop(0, currentTheme.tempFill);
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            // Gradient fill under temperature curve
+            const tempGradient = ctx.createLinearGradient(0, tempY, 0, tempY + tempHeight + 10);
+            tempGradient.addColorStop(0, currentTheme.tempFill);
+            tempGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
             ctx.beginPath();
-            ctx.moveTo(smoothPoints[0].x, tempY + tempHeight);
-            smoothPoints.forEach(p => ctx.lineTo(p.x, p.y));
-            ctx.lineTo(smoothPoints[smoothPoints.length - 1].x, tempY + tempHeight);
+            ctx.moveTo(smoothTempPoints[0].x, tempY + tempHeight);
+            smoothTempPoints.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.lineTo(smoothTempPoints[smoothTempPoints.length - 1].x, tempY + tempHeight);
             ctx.closePath();
-            ctx.fillStyle = gradient;
+            ctx.fillStyle = tempGradient;
             ctx.fill();
 
-            // Draw temperature curve
+            // Temperature curve line
             ctx.beginPath();
-            ctx.moveTo(smoothPoints[0].x, smoothPoints[0].y);
-            smoothPoints.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.moveTo(smoothTempPoints[0].x, smoothTempPoints[0].y);
+            smoothTempPoints.forEach(p => ctx.lineTo(p.x, p.y));
             ctx.strokeStyle = currentTheme.tempCurve;
-            ctx.lineWidth = 2.5;
+            ctx.lineWidth = 2;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.stroke();
 
-            // Layer 4: Precipitation bars
-            const precipY = chartY + chartHeight - 45;
-            const precipMaxHeight = 30;
+            // Layer 4: Wind speed line (red)
+            const windY = chartY + 30;
+            const windHeight = 40;
+
+            const windPoints = [];
+            for (let i = 0; i < 72; i++) {
+                const x = chartX + (i / 72) * chartWidth;
+                const normalizedWind = weatherData[i].wind / windRange;
+                const y = windY + windHeight - (normalizedWind * windHeight);
+                windPoints.push({ x, y });
+            }
+
+            const smoothWindPoints = smoothCurve(windPoints);
+
+            ctx.beginPath();
+            ctx.moveTo(smoothWindPoints[0].x, smoothWindPoints[0].y);
+            smoothWindPoints.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.strokeStyle = currentTheme.windSpeed;
+            ctx.lineWidth = 1.5;
+            ctx.globalAlpha = 0.7;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+
+            // Layer 5: Precipitation bars
+            const precipY = chartY + chartHeight - 40;
+            const precipMaxHeight = 28;
 
             for (let i = 0; i < 72; i++) {
                 const precip = weatherData[i].precip;
@@ -565,9 +622,8 @@
                 }
             }
 
-            // Layer 5: Time markers
-            ctx.font = '400 11px -apple-system, sans-serif';
-            ctx.fillStyle = currentTheme.textDim;
+            // Layer 6: Time markers
+            ctx.font = '400 10px -apple-system, sans-serif';
             ctx.textAlign = 'center';
 
             const days = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
@@ -578,46 +634,51 @@
                 const x = chartX + (i / 72) * chartWidth;
 
                 // Hour label
-                if (i > 0) {
+                if (i > 0 && hour !== 0) {
                     ctx.fillStyle = currentTheme.textDim;
-                    ctx.fillText(hour.toString(), x, chartY + chartHeight - 2);
+                    ctx.fillText(hour.toString(), x, chartY + chartHeight - 1);
                 }
 
                 // Day separator at midnight
                 if (hour === 0 && i > 0) {
                     ctx.strokeStyle = currentTheme.textDim;
                     ctx.lineWidth = 0.5;
+                    ctx.setLineDash([2, 2]);
                     ctx.beginPath();
-                    ctx.moveTo(x, chartY);
-                    ctx.lineTo(x, chartY + chartHeight - 15);
+                    ctx.moveTo(x, chartY + 5);
+                    ctx.lineTo(x, chartY + chartHeight - 12);
                     ctx.stroke();
+                    ctx.setLineDash([]);
 
                     // Day label
                     const dayIndex = (today + Math.floor((currentHour + i) / 24)) % 7;
                     ctx.fillStyle = currentTheme.textSecondary;
-                    ctx.font = '600 11px -apple-system, sans-serif';
-                    ctx.fillText(days[dayIndex], x + 30, chartY + chartHeight - 2);
-                    ctx.font = '400 11px -apple-system, sans-serif';
+                    ctx.font = '600 10px -apple-system, sans-serif';
+                    ctx.fillText(days[dayIndex], x, chartY + chartHeight - 1);
+                    ctx.font = '400 10px -apple-system, sans-serif';
                 }
             }
 
-            // Layer 6: Temperature labels at min/max
-            ctx.font = '500 12px -apple-system, sans-serif';
+            // Temperature labels at peaks/valleys
+            ctx.font = '500 11px -apple-system, sans-serif';
             ctx.fillStyle = currentTheme.textPrimary;
 
-            // Find local maxima and minima
-            for (let i = 1; i < 71; i++) {
+            let lastLabelX = -50;
+            for (let i = 2; i < 70; i++) {
                 const prev = weatherData[i - 1].temp;
                 const curr = weatherData[i].temp;
                 const next = weatherData[i + 1].temp;
 
-                if ((curr > prev && curr > next) || (curr < prev && curr < next)) {
-                    if (i % 8 < 2) { // Don't show too many labels
-                        const x = chartX + (i / 72) * chartWidth;
+                const isMax = curr > prev && curr > next;
+                const isMin = curr < prev && curr < next;
+
+                if ((isMax || isMin)) {
+                    const x = chartX + (i / 72) * chartWidth;
+                    if (x - lastLabelX > 45) {
                         const normalizedTemp = (curr - minTemp) / tempRange;
                         const y = tempY + tempHeight - (normalizedTemp * tempHeight);
-
-                        ctx.fillText(Math.round(curr) + '°', x, y - 8);
+                        ctx.fillText(Math.round(curr) + '°', x, y - 6);
+                        lastLabelX = x;
                     }
                 }
             }
@@ -634,14 +695,14 @@
             ctx.fillStyle = currentTheme.nowLine;
             ctx.beginPath();
             ctx.moveTo(chartX, chartY);
-            ctx.lineTo(chartX - 5, chartY - 8);
-            ctx.lineTo(chartX + 5, chartY - 8);
+            ctx.lineTo(chartX - 4, chartY - 6);
+            ctx.lineTo(chartX + 4, chartY - 6);
             ctx.closePath();
             ctx.fill();
         }
 
         function drawDate() {
-            const y = 218;
+            const y = 200;
             const centerX = 227;
 
             const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -652,31 +713,31 @@
             const date = now.getDate();
             const month = months[now.getMonth()];
 
-            // Get ISO week number
+            // ISO week number
             const startOfYear = new Date(now.getFullYear(), 0, 1);
             const weekNum = Math.ceil((((now - startOfYear) / 86400000) + startOfYear.getDay() + 1) / 7);
 
-            ctx.font = '400 18px -apple-system, sans-serif';
+            ctx.font = '400 16px -apple-system, sans-serif';
             ctx.fillStyle = currentTheme.textPrimary;
             ctx.textAlign = 'center';
-            ctx.fillText(`${dayName} ${date} ${month}`, centerX - 20, y);
+            ctx.fillText(`${dayName} ${date} ${month}`, centerX - 15, y);
 
             // Week badge
-            const badgeX = centerX + 55;
-            const badgeY = y - 13;
+            const badgeX = centerX + 45;
+            const badgeY = y - 12;
 
             ctx.fillStyle = currentTheme.weekBadge;
-            roundRect(ctx, badgeX, badgeY, 24, 18, 4);
+            roundRect(ctx, badgeX, badgeY, 22, 16, 3);
             ctx.fill();
 
-            ctx.font = '600 12px -apple-system, sans-serif';
+            ctx.font = '600 11px -apple-system, sans-serif';
             ctx.fillStyle = '#000000';
-            ctx.fillText(weekNum.toString(), badgeX + 12, y - 1);
+            ctx.fillText(weekNum.toString(), badgeX + 11, y - 1);
         }
 
         function drawTime() {
             const centerX = 227;
-            const timeY = 320;
+            const timeY = 295;
 
             const now = new Date();
             let hours = now.getHours();
@@ -690,92 +751,101 @@
 
             const timeStr = `${hours}:${minutes.toString().padStart(2, '0')}`;
 
-            // Measure time width for positioning
-            ctx.font = '300 120px -apple-system, sans-serif';
+            // Measure time for positioning
+            ctx.font = '300 110px -apple-system, sans-serif';
             const timeWidth = ctx.measureText(timeStr).width;
-            const timeX = centerX - timeWidth / 2 - 15;
+            const timeX = centerX - timeWidth / 2 - 20;
+            const digitHeight = 85;
+            const baselineY = timeY;
+            const topY = baselineY - digitHeight;
 
-            // Draw unfilled time (dim)
-            ctx.fillStyle = currentTheme.textDim;
-            ctx.textAlign = 'left';
-            ctx.fillText(timeStr, timeX, timeY);
+            // Calculate fill height based on step progress
+            const fillHeight = digitHeight * stepProgress;
+            const fillY = baselineY - fillHeight;
 
-            // Draw filled time (clipped by step progress)
+            // Draw unfilled portion (dim gray) - TOP part
             ctx.save();
-            const fillHeight = 120 * stepProgress;
             ctx.beginPath();
-            ctx.rect(0, timeY - 95 + (120 - fillHeight), 454, fillHeight);
+            ctx.rect(0, topY - 20, 454, fillY - topY + 20);
             ctx.clip();
+            ctx.fillStyle = currentTheme.timeUnfilled;
+            ctx.fillText(timeStr, timeX, timeY);
+            ctx.restore();
 
+            // Draw filled portion (teal) - BOTTOM part
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, fillY, 454, fillHeight + 20);
+            ctx.clip();
             ctx.fillStyle = currentTheme.timeFill;
             ctx.fillText(timeStr, timeX, timeY);
             ctx.restore();
 
-            // Draw full brightness outline on top
-            ctx.fillStyle = currentTheme.timePrimary;
-            ctx.fillText(timeStr, timeX, timeY);
-
             // AM/PM
-            ctx.font = '400 20px -apple-system, sans-serif';
+            ctx.font = '400 18px -apple-system, sans-serif';
             ctx.fillStyle = currentTheme.textSecondary;
-            ctx.fillText(isPM ? 'PM' : 'AM', timeX + timeWidth + 8, timeY - 75);
+            ctx.textAlign = 'left';
+            ctx.fillText(isPM ? 'PM' : 'AM', timeX + timeWidth + 10, timeY - 65);
 
             // Seconds
-            ctx.font = '300 28px -apple-system, sans-serif';
+            ctx.font = '300 24px -apple-system, sans-serif';
             ctx.fillStyle = currentTheme.textSecondary;
-            ctx.fillText(seconds.toString().padStart(2, '0'), timeX + timeWidth + 8, timeY - 45);
+            ctx.fillText(seconds.toString().padStart(2, '0'), timeX + timeWidth + 10, timeY - 38);
         }
 
         function drawStats() {
-            const y = 400;
+            const y = 360;
             const centerX = 227;
 
-            // Move bar (5 dots)
-            const moveBarY = y - 25;
-            const dotSpacing = 12;
-            const moveLevel = 2; // 0-5
+            // Move bar (5 dots) - centered above stats
+            const moveBarY = y - 22;
+            const dotSpacing = 10;
+            const moveLevel = 2;
 
             for (let i = 0; i < 5; i++) {
                 const dotX = centerX - (2 * dotSpacing) + (i * dotSpacing);
                 ctx.beginPath();
                 ctx.arc(dotX, moveBarY, 3, 0, Math.PI * 2);
-
-                if (i < moveLevel) {
-                    ctx.fillStyle = currentTheme.moveBar;
-                } else {
-                    ctx.fillStyle = currentTheme.textDim;
-                }
+                ctx.fillStyle = i < moveLevel ? currentTheme.moveBar : currentTheme.moveBarEmpty;
                 ctx.fill();
             }
 
-            // Heart rate
-            ctx.font = '400 16px -apple-system, sans-serif';
-            ctx.textAlign = 'left';
+            // Stats row - more compact and centered
+            const statsY = y + 5;
 
-            // Heart icon
+            // Heart rate (left)
+            ctx.textAlign = 'center';
+
+            // HR Icon (heart shape)
             ctx.fillStyle = currentTheme.hrIcon;
-            ctx.font = '16px -apple-system, sans-serif';
-            ctx.fillText('♥', 70, y + 8);
+            ctx.font = '14px -apple-system, sans-serif';
+            ctx.fillText('♥', 95, statsY);
 
             ctx.fillStyle = currentTheme.textPrimary;
-            ctx.font = '500 16px -apple-system, sans-serif';
-            ctx.fillText('142', 90, y + 8);
+            ctx.font = '500 15px -apple-system, sans-serif';
+            ctx.fillText('142', 130, statsY);
 
-            // Steps
-            ctx.fillStyle = currentTheme.textSecondary;
-            ctx.font = '400 16px -apple-system, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('7,696', centerX, y + 8);
+            // Steps (center)
+            ctx.fillStyle = currentTheme.textPrimary;
+            ctx.font = '500 15px -apple-system, sans-serif';
+            ctx.fillText('7,696', centerX, statsY);
 
-            ctx.font = '400 12px -apple-system, sans-serif';
+            ctx.font = '400 10px -apple-system, sans-serif';
             ctx.fillStyle = currentTheme.textDim;
-            ctx.fillText('steps', centerX, y + 24);
+            ctx.fillText('steps', centerX, statsY + 14);
 
-            // Data field (elevation)
-            ctx.textAlign = 'right';
-            ctx.fillStyle = currentTheme.textSecondary;
-            ctx.font = '400 16px -apple-system, sans-serif';
-            ctx.fillText('↑ 32m', 385, y + 8);
+            // Floors (right)
+            ctx.fillStyle = currentTheme.floorIcon;
+            ctx.font = '14px -apple-system, sans-serif';
+            ctx.fillText('↑', 320, statsY);
+
+            ctx.fillStyle = currentTheme.textPrimary;
+            ctx.font = '500 15px -apple-system, sans-serif';
+            ctx.fillText('32', 345, statsY);
+
+            ctx.font = '400 10px -apple-system, sans-serif';
+            ctx.fillStyle = currentTheme.textDim;
+            ctx.fillText('floors', 335, statsY + 14);
         }
 
         function roundRect(ctx, x, y, width, height, radius) {
@@ -831,7 +901,18 @@
             drawWatch();
         });
 
-        // Initial draw and animation loop
+        document.getElementById('timezone2').addEventListener('input', (e) => {
+            timezone2Name = e.target.value.toUpperCase();
+            drawWatch();
+        });
+
+        document.getElementById('tzOffset').addEventListener('input', (e) => {
+            timezone2Offset = parseInt(e.target.value);
+            document.getElementById('tzOffsetValue').textContent = (timezone2Offset >= 0 ? '+' : '') + timezone2Offset + 'h';
+            drawWatch();
+        });
+
+        // Animation loop
         function animate() {
             drawWatch();
             requestAnimationFrame(animate);
