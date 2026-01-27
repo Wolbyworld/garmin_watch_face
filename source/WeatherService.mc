@@ -40,11 +40,15 @@ class WeatherService extends System.ServiceDelegate {
             lon = Application.Storage.getValue("weather_lon");
         }
 
-        // If still no location, skip this fetch (no point fetching weather for unknown location)
+        // Final fallback: default location (Pozuelo de Alarcón, Spain)
+        // Used after device reset when no GPS activity has been recorded yet
         if (lat == null || lon == null) {
-            System.println("No GPS position available - skipping weather fetch");
-            Background.exit(null);
-            return;
+            lat = 40.4353;   // Pozuelo de Alarcón latitude
+            lon = -3.8139;   // Pozuelo de Alarcón longitude
+            Application.Storage.setValue("using_default_location", true);
+            System.println("Using default location (Pozuelo de Alarcón)");
+        } else {
+            Application.Storage.setValue("using_default_location", false);
         }
 
         // Build Open-Meteo API URL
@@ -79,6 +83,11 @@ class WeatherService extends System.ServiceDelegate {
             // Log error - data will fallback to Garmin API
             System.println("Weather fetch failed: " + responseCode);
         }
+
+        // Schedule next fetch in 30 minutes (self-reschedule)
+        // This ensures background service keeps running regardless of watch face state
+        var nextRun = Time.now().add(new Time.Duration(1800));
+        Background.registerForTemporalEvent(nextRun);
 
         // Signal completion - pass null as no data needs to be sent to foreground
         Background.exit(null);

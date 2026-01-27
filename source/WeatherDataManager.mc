@@ -7,10 +7,10 @@ using Toybox.Background;
 
 // WeatherDataManager: Fetches and caches weather data from external API (Open-Meteo)
 // Falls back to Garmin Weather API if external data unavailable
-// Provides 72-hour forecast arrays for the weather chart
+// Provides 96-hour (4 days) forecast arrays for the weather chart
 module WeatherDataManager {
 
-    // Cached data arrays (72 hours)
+    // Cached data arrays (96 hours)
     var temps = null;
     var hours = null;
     var precips = null;
@@ -82,18 +82,18 @@ module WeatherDataManager {
     // Fetch all weather data - tries external API first, falls back to Garmin
     function fetchWeatherData() {
         // Initialize arrays
-        temps = new [72];
-        hours = new [72];
-        precips = new [72];
-        clouds = new [72];
-        winds = new [72];
+        temps = new [96];
+        hours = new [96];
+        precips = new [96];
+        clouds = new [96];
+        winds = new [96];
 
-        dayHighs = new [3];
-        dayLows = new [3];
-        dayHighIdx = new [3];
-        dayLowIdx = new [3];
+        dayHighs = new [4];
+        dayLows = new [4];
+        dayHighIdx = new [4];
+        dayLowIdx = new [4];
 
-        for (var d = 0; d < 3; d++) {
+        for (var d = 0; d < 4; d++) {
             dayHighs[d] = -100.0;
             dayLows[d] = 100.0;
             dayHighIdx[d] = 0;
@@ -141,8 +141,8 @@ module WeatherDataManager {
         var now = Time.now().value();
         var age = now - extFetchTime;
 
-        // External data expires after 1 hour (3600 seconds)
-        if (age > 3600) {
+        // External data expires after 12 hours (stale forecast is still useful)
+        if (age > 43200) {
             return false;
         }
 
@@ -172,7 +172,7 @@ module WeatherDataManager {
 
         var extSize = extTemps.size();
 
-        for (var i = 0; i < 72; i++) {
+        for (var i = 0; i < 96; i++) {
             var hour = (currentHour + i) % 24;
             hours[i] = hour;
 
@@ -196,7 +196,7 @@ module WeatherDataManager {
 
             // Track daily extremes
             var dayIndex = (currentHour + i) / 24;
-            if (dayIndex < 3) {
+            if (dayIndex < 4) {
                 if (temps[i] > dayHighs[dayIndex]) {
                     dayHighs[dayIndex] = temps[i];
                     dayHighIdx[dayIndex] = i;
@@ -221,7 +221,7 @@ module WeatherDataManager {
             // Fill arrays from API data
             var forecastSize = forecast.size();
 
-            for (var i = 0; i < 72; i++) {
+            for (var i = 0; i < 96; i++) {
                 var hour = (currentHour + i) % 24;
                 hours[i] = hour;
 
@@ -248,7 +248,7 @@ module WeatherDataManager {
 
                 // Track daily extremes
                 var dayIndex = (currentHour + i) / 24;
-                if (dayIndex < 3) {
+                if (dayIndex < 4) {
                     if (temps[i] > dayHighs[dayIndex]) {
                         dayHighs[dayIndex] = temps[i];
                         dayHighIdx[dayIndex] = i;
@@ -343,7 +343,7 @@ module WeatherDataManager {
 
     // Generate complete default data when no API data available
     function generateDefaultData(currentHour) {
-        for (var i = 0; i < 72; i++) {
+        for (var i = 0; i < 96; i++) {
             var hour = (currentHour + i) % 24;
             hours[i] = hour;
 
@@ -362,7 +362,7 @@ module WeatherDataManager {
 
             // Track daily extremes
             var dayIndex = (currentHour + i) / 24;
-            if (dayIndex < 3) {
+            if (dayIndex < 4) {
                 if (temps[i] > dayHighs[dayIndex]) {
                     dayHighs[dayIndex] = temps[i];
                     dayHighIdx[dayIndex] = i;

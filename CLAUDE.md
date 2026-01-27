@@ -91,9 +91,11 @@ The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face t
 - Activity rings with HR (+ heart icon) in center, steps below
 - Two secondary timezones: São Paulo (UTC-3) and San Francisco (UTC-8)
 - **External Weather API (Open-Meteo)** ✅ Working on real device!
-  - Fetches 4 days of data every 30 minutes via background service (UI shows 72h)
+  - Fetches 4 days of data every 30 minutes via background service (UI shows 96h)
   - Uses last GPS position from activities (updates when you run/bike)
-  - Falls back to Garmin API if no GPS position or external data unavailable
+  - Falls back to default location (Pozuelo de Alarcón) after device reset
+  - Falls back to Garmin API if external data unavailable
+  - Red warning cloud shown when using default location (no GPS data)
 - **Time fill visual fix** - Scaled by 1.5x so visual fill matches perceived completion
 
 ## Learnings from Development (January 2026)
@@ -285,6 +287,7 @@ garmin_watch_face/
 - ~~GPS-based location~~ ✅ Done (uses last GPS position from activities)
 - ~~Test external weather API on real device~~ ✅ Working!
 - ~~Implement settings screen~~ ✅ Done (22 settings across 6 categories)
+- **HR not showing in ring center** - `centerData` default was invalid (3), changed to 1 but still not rendering. Investigate `WatchFaceView.mc` center data rendering logic.
 
 ### Settings System
 

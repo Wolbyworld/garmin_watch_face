@@ -98,6 +98,7 @@
 - ~~Body Battery API needs actual implementation (currently using placeholder)~~ ✅ Done
 - ~~Heart rate needs to read from Activity.getActivityInfo() for live HR~~ ✅ Done
 - ~~Weather chart uses simulated data - need to connect real API~~ ✅ Done
+- **HR not showing in ring center** - Changed default from 3 to 1, still not rendering. Need to investigate `WatchFaceView.mc` lines 618-631 center rendering logic
 
 ## Fixed (January 2026)
 

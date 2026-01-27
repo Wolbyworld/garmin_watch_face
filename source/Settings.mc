@@ -29,7 +29,7 @@ module Settings {
     var _outerRing = 0;         // 0=Steps, 1=Floors, 2=BodyBatt, 3=HR, 4=Off
     var _middleRing = 1;
     var _innerRing = 2;
-    var _centerData = 3;        // 0=Steps, 1=HR, 2=Off
+    var _centerData = 1;        // 0=Steps, 1=HR, 2=Off
     var _showRingIcons = true;
 
     // Appearance
@@ -77,7 +77,7 @@ module Settings {
         _outerRing = getNumberProperty(app, "outerRing", 0);
         _middleRing = getNumberProperty(app, "middleRing", 1);
         _innerRing = getNumberProperty(app, "innerRing", 2);
-        _centerData = getNumberProperty(app, "centerData", 3);
+        _centerData = getNumberProperty(app, "centerData", 1);
         _showRingIcons = getBoolProperty(app, "showRingIcons", true);
 
         // Appearance

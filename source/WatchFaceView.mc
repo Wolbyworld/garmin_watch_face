@@ -8,6 +8,7 @@ using Toybox.SensorHistory;
 using Toybox.Time;
 using Toybox.Time.Gregorian;
 using Toybox.Math;
+using Toybox.Application;
 
 class WatchFaceView extends WatchUi.WatchFace {
 
@@ -128,6 +129,9 @@ class WatchFaceView extends WatchUi.WatchFace {
             : "18°";
         var locationStr = WeatherDataManager.locationName;
 
+        // Check if using default location (no GPS data)
+        var usingDefault = Application.Storage.getValue("using_default_location");
+
         // Temperature on line 1 (centered, brighter)
         dc.setColor(Theme.TIME_PRIMARY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(center, 7, Graphics.FONT_XTINY, tempStr, Graphics.TEXT_JUSTIFY_CENTER);
@@ -135,6 +139,23 @@ class WatchFaceView extends WatchUi.WatchFace {
         // City on line 2 (centered, dimmer)
         dc.setColor(Theme.TEXT_SECONDARY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(center, 30, Graphics.FONT_XTINY, locationStr, Graphics.TEXT_JUSTIFY_CENTER);
+
+        // Show red warning cloud if using default location
+        if (usingDefault == true) {
+            drawWarningCloud(dc, center + 55, 30);
+        }
+    }
+
+    // Draw a small red cloud to indicate default location is being used
+    private function drawWarningCloud(dc, x, y) {
+        var color = 0xE57373;  // Soft red (same as low battery)
+        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+        // Small puffy cloud shape (12px wide, 8px tall)
+        dc.fillCircle(x, y, 4);       // center
+        dc.fillCircle(x - 5, y + 1, 3); // left
+        dc.fillCircle(x + 5, y + 1, 3); // right
+        dc.fillCircle(x - 2, y - 2, 2); // top-left
+        dc.fillCircle(x + 2, y - 2, 2); // top-right
     }
 
     private function drawWeatherChart(dc) {
@@ -175,14 +196,14 @@ class WatchFaceView extends WatchUi.WatchFace {
         for (var i = 0; i < chartWidth; i += 2) {
             var idx = (i * forecastHours / chartWidth);
             if (idx >= forecastHours) { idx = forecastHours - 1; }
-            if (idx >= 72) { idx = 71; }
+            if (idx >= 96) { idx = 95; }
             dc.setColor(Theme.getSkyColor(hours[idx]), Graphics.COLOR_TRANSPARENT);
             dc.fillRectangle(chartX + i, bandY, 2, bandHeight);
         }
 
         // Clouds at top - organic shapes using overlapping circles
         if (Settings.isShowClouds()) {
-            for (var i = 0; i < forecastHours && i < 72; i += 3) {
+            for (var i = 0; i < forecastHours && i < 96; i += 3) {
                 var c = clouds[i];
                 if (c > 35) {
                     var x = chartX + (i * chartWidth / forecastHours);
@@ -223,7 +244,7 @@ class WatchFaceView extends WatchUi.WatchFace {
             var prevX = -1;
             var prevTempY = -1;
 
-            for (var i = 0; i < forecastHours && i < 72; i++) {
+            for (var i = 0; i < forecastHours && i < 96; i++) {
                 var x = chartX + (i * chartWidth / forecastHours);
                 var norm = (temps[i] - minTemp) / tempRange;
                 if (norm < 0.0) { norm = 0.0; }
@@ -248,7 +269,7 @@ class WatchFaceView extends WatchUi.WatchFace {
             var prevX = -1;
             var prevWindY = -1;
 
-            for (var i = 0; i < forecastHours && i < 72; i++) {
+            for (var i = 0; i < forecastHours && i < 96; i++) {
                 var x = chartX + (i * chartWidth / forecastHours);
                 var norm = winds[i] / 20.0;
                 if (norm > 1.0) { norm = 1.0; }
@@ -266,7 +287,7 @@ class WatchFaceView extends WatchUi.WatchFace {
         if (Settings.isShowPrecipitation()) {
             var precipBaseY = chartY + chartHeight - 12;
 
-            for (var i = 0; i < forecastHours && i < 72; i++) {
+            for (var i = 0; i < forecastHours && i < 96; i++) {
                 var precipChance = precips[i];
                 if (precipChance > 5) {
                     var x = chartX + (i * chartWidth / forecastHours);
@@ -284,7 +305,7 @@ class WatchFaceView extends WatchUi.WatchFace {
         var days = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
         var dayLabelY = chartY + chartHeight + 3;
 
-        for (var i = 6; i < forecastHours && i < 72; i += 6) {
+        for (var i = 6; i < forecastHours && i < 96; i += 6) {
             var hour = (currentHour + i) % 24;
             var x = chartX + (i * chartWidth / forecastHours);
 
