@@ -3,28 +3,28 @@ using Toybox.Math;
 using Toybox.System;
 
 module Theme {
-    // Colors (these don't change)
+    // Colors - brightened for better visibility
     const BG = 0x000000;
     const TIME_PRIMARY = 0xFFFFFF;
-    const TIME_UNFILLED = 0x252525;
+    const TIME_UNFILLED = 0x606060;  // Brightened more for visibility
     const TIME_FILL = 0x26A69A;
-    const TEXT_PRIMARY = 0xB0B0B0;
-    const TEXT_SECONDARY = 0x707070;
-    const TEXT_DIM = 0x454545;
+    const TEXT_PRIMARY = 0xC8C8C8;   // Brightened from 0xB0B0B0
+    const TEXT_SECONDARY = 0x909090; // Brightened from 0x707070
+    const TEXT_DIM = 0x606060;       // Brightened from 0x454545
     const TEMP_CURVE = 0xFFB347;
     const PRECIPITATION = 0x4DD0E1;
     const WIND_SPEED = 0xEF5350;
     const CLOUD_COLOR = 0xFFFFFF;
-    const NIGHT_SKY = 0x0A1628;
-    const DAY_SKY = 0x1E4D6B;
+    const NIGHT_SKY = 0x0D1E30;      // Slightly brightened
+    const DAY_SKY = 0x2A5F80;
     const HR_RING = 0xE57373;
     const STEPS_RING = 0x26A69A;
     const FLOORS_RING = 0xFFD54F;  // Gold/yellow for better distinction
     const BODY_BATTERY_RING = 0x42A5F5;  // Brighter blue for body battery
     const WEEK_BADGE = 0xFF8A65;
     const NOW_LINE = 0xFFFFFF;
-    const AOD_TIME = 0x606060;
-    const AOD_TEXT = 0x404040;
+    const AOD_TIME = 0x707070;  // Brightened for readability
+    const AOD_TEXT = 0x505050;  // Brightened for readability
 
     // Dynamic layout - call these with dc to get positions
     var screenWidth = 454;

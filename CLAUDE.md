@@ -83,5 +83,157 @@ The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face t
 
 ## Status
 - Design approved by user
-- Implementation not yet started
-- Need to research exact CIQ project scaffolding, device IDs, and API signatures before writing code
+- **Working implementation** - all major features functional
+- Custom mini-digit renderer (7x9 pixels) for tiny text where FONT_XTINY is too large
+- Organic cloud shapes using overlapping circles
+- Activity rings with HR in center, steps below
+- Secondary timezone (UTC) display
+- **Weather API integrated** via WeatherDataManager.mc (Garmin API fallback with 15-min cache)
+- **External Weather API (Open-Meteo)** implemented via WeatherService.mc background service
+  - Fetches from Open-Meteo every 30 minutes via temporal event
+  - Stores in Application.Storage, WeatherDataManager reads from storage
+  - Falls back to Garmin API if external data unavailable
+- **Time fill visual fix** - Scaled by 1.5x so visual fill matches perceived completion
+
+## Learnings from Development (January 2026)
+
+### SDK Setup
+- **SDK Location**: `~/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-X.X.X-YYYY-MM-DD-xxxxx/`
+- **Java 17 required**: Install via `brew install openjdk@17` then symlink to `/Library/Java/JavaVirtualMachines/`
+- **Signing key**: Must be DER format (not PEM). Generate with:
+  ```bash
+  openssl genrsa -out developer_key_raw.pem 4096
+  openssl pkcs8 -topk8 -inform PEM -outform DER -in developer_key_raw.pem -out developer_key.der -nocrypt
+  ```
+
+### Build & Run Commands
+```bash
+SDK_PATH="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-8.4.0-2025-12-03-5122605dc"
+"$SDK_PATH/bin/monkeyc" -d fenix847mm -f monkey.jungle -o watchface.prg -y developer_key.der
+"$SDK_PATH/bin/monkeydo" watchface.prg fenix847mm
+```
+
+### Monkey C Language Gotchas
+1. **Type annotations** - Generally avoid, except for HTTP callbacks (SDK 8.4.0+ requires them):
+   ```monkeyc
+   // Regular functions - no type annotations needed:
+   function draw(dc) {}
+
+   // HTTP callbacks - REQUIRE type annotations in SDK 8.4.0+:
+   function handleResponse(responseCode as Lang.Number, data as Lang.Dictionary or Lang.String or Null) as Void {
+       // Must use typed signature for makeWebRequest callbacks
+   }
+   ```
+
+2. **Permissions**: Use `Background` permission (not `Weather`) for weather API access:
+   ```xml
+   <iq:uses-permission id="Background"/>
+   ```
+
+3. **AOD detection**: Don't use `requiresBurnInProtection` - it's always true on AMOLED. Track sleep state with callbacks:
+   ```monkeyc
+   private var _isAwake = true;
+   function onEnterSleep() { _isAwake = false; WatchUi.requestUpdate(); }
+   function onExitSleep() { _isAwake = true; WatchUi.requestUpdate(); }
+   ```
+
+4. **Dynamic layout**: Don't hardcode 454x454. Use `dc.getWidth()`/`dc.getHeight()` and calculate proportionally:
+   ```monkeyc
+   function initLayout(dc) {
+       screenWidth = dc.getWidth();
+       screenHeight = dc.getHeight();
+   }
+   function getCenter() { return screenWidth / 2; }
+   function getTimeY() { return (screenHeight * 0.66).toNumber(); }
+   ```
+
+5. **Weather API**:
+   - `Weather.getHourlyForecast()` returns array of hourly forecasts (up to 72 hours = 3 days)
+   - `Weather.getCurrentConditions()` returns current weather
+   - Each hourly entry has: `temperature`, `windSpeed`, `precipitationChance`, `forecastTime`, etc.
+   - Returns `null` if no weather data available - always check!
+
+6. **Number conversions**: Use `.toFloat()` and `.toNumber()` explicitly for arithmetic
+
+### Custom Mini-Digit Renderer
+**Problem**: `FONT_XTINY` is the smallest Garmin font but still too large for some UI elements (temp boxes on chart, HR in ring center, day labels).
+
+**Solution**: Custom pixel-based digit/letter renderer drawing 7x9 pixel characters using `fillRectangle()`:
+```monkeyc
+// Draw a 6x8 pixel digit
+private function drawMiniDigit(dc, x, y, digit, color) {
+    dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+    if (digit == 0) {
+        dc.fillRectangle(x+1, y, 4, 1);    // top
+        dc.fillRectangle(x+1, y+7, 4, 1);  // bottom
+        dc.fillRectangle(x, y+1, 1, 6);    // left
+        dc.fillRectangle(x+5, y+1, 1, 6);  // right
+    }
+    // ... etc for 1-9
+}
+
+// Wrapper to draw multi-digit numbers (supports negative)
+private function drawMiniNumber(dc, centerX, centerY, number, color) {
+    var isNegative = number < 0;
+    if (isNegative) { number = -number; }
+    // Draw minus sign if needed, then each digit
+}
+```
+
+### Organic Cloud Rendering
+**Problem**: Rectangle clouds look blocky and ugly.
+
+**Solution**: Use overlapping `fillCircle()` calls to create puffy cloud shapes:
+```monkeyc
+// Draw puffy cloud with multiple overlapping circles
+dc.fillCircle(x + 4, baseY, 4);      // left puff
+dc.fillCircle(x + 10, baseY, 5);     // center (larger)
+dc.fillCircle(x + 17, baseY, 4);     // right puff
+if (cloudCoverage > 50) {
+    dc.fillCircle(x + 7, baseY - 3, 3);   // top-left puff
+    dc.fillCircle(x + 13, baseY - 3, 3);  // top-right puff
+}
+```
+- Opacity scales with cloud coverage percentage
+- More/larger circles for heavier cloud cover
+
+### UI Layout Tips
+- **Header spacing**: Use at least 20px between stacked text lines to avoid overlap
+- **Ring center text**: Mini-digits work well for HR display in activity rings
+- **Week badge**: Size badge 24x18px to fully contain week number text
+- **Day labels**: Single letters (M, T, W, T, F, S) using mini-letters save space
+
+### Project Structure (Simplified)
+```
+garmin_watch_face/
+├── manifest.xml
+├── monkey.jungle
+├── developer_key.der
+├── simulation-data.json     # Mock weather data for simulator
+├── CLAUDE.md
+├── TODO.md
+├── source/
+│   ├── WatchFaceApp.mc      # App entry point + getServiceDelegate()
+│   ├── WatchFaceView.mc     # All rendering (weather, time, stats, rings)
+│   ├── WatchFaceDelegate.mc # Sleep/wake handling
+│   ├── WeatherDataManager.mc # Weather data cache + Garmin API fallback
+│   ├── WeatherService.mc    # Background service for Open-Meteo API
+│   └── Theme.mc             # Colors and layout constants
+└── resources/
+    ├── strings.xml
+    ├── settings.xml
+    ├── properties.xml
+    ├── drawables.xml
+    └── drawables/launcher_icon.png
+```
+
+### Remaining TODOs
+- ~~Connect real Weather API~~ ✅ Done (WeatherDataManager.mc + WeatherService.mc)
+- ~~External Weather API~~ ✅ Done (Open-Meteo via background service)
+- ~~Time fill visual fix~~ ✅ Done (1.5x scale factor)
+- ~~Read actual Body Battery~~ ✅ Done (SensorHistory.getBodyBatteryHistory)
+- ~~Read actual HR~~ ✅ Done (Activity.getActivityInfo + ActivityMonitor.getHeartRateHistory)
+- ~~Add battery indicator~~ ✅ Done (top-right corner)
+- Add location setting in settings.xml (currently defaults to Madrid)
+- Implement settings screen (ring data sources, timezone, theme)
+- Test external weather API on real device

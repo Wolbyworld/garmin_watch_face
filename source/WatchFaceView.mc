@@ -3,6 +3,8 @@ using Toybox.Graphics;
 using Toybox.System;
 using Toybox.Weather;
 using Toybox.ActivityMonitor;
+using Toybox.Activity;
+using Toybox.SensorHistory;
 using Toybox.Time;
 using Toybox.Time.Gregorian;
 using Toybox.Math;
@@ -10,6 +12,16 @@ using Toybox.Math;
 class WatchFaceView extends WatchUi.WatchFace {
 
     private var _isAwake = true;
+
+    // SIMULATOR DEBUG MODE: Set to true for testing in simulator, false for release
+    // The Garmin simulator does NOT populate ActivityMonitor data from simulation-data.json
+    private const DEBUG_SIMULATOR = false;
+    private const DEBUG_STEPS = 2108;
+    private const DEBUG_STEP_GOAL = 7000;
+    private const DEBUG_FLOORS = 3;
+    private const DEBUG_FLOOR_GOAL = 10;
+    private const DEBUG_BODY_BATTERY = 72;
+    private const DEBUG_HR = 68;
 
     function initialize() {
         WatchFace.initialize();
@@ -33,6 +45,10 @@ class WatchFaceView extends WatchUi.WatchFace {
             return;
         }
 
+        // Refresh weather data if cache is stale
+        WeatherDataManager.refreshIfNeeded();
+
+        drawBattery(dc);
         drawHeader(dc);
         drawWeatherChart(dc);
         drawDate(dc);
@@ -50,26 +66,57 @@ class WatchFaceView extends WatchUi.WatchFace {
         WatchUi.requestUpdate();
     }
 
+    private function drawBattery(dc) {
+        var stats = System.getSystemStats();
+        var battery = stats.battery.toNumber();
+
+        // Position: top-right corner
+        var x = Theme.screenWidth - 38;
+        var y = 12;
+
+        // Battery icon dimensions
+        var w = 22;
+        var h = 10;
+        var tipW = 2;
+        var tipH = 4;
+
+        // Color based on level
+        var color = Theme.TEXT_DIM;
+        if (battery <= 20) {
+            color = 0xE57373;  // Red when low
+        } else if (battery <= 40) {
+            color = 0xFFB347;  // Amber when medium-low
+        }
+
+        // Battery outline
+        dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
+        dc.drawRectangle(x, y, w, h);
+
+        // Battery tip (positive terminal)
+        dc.fillRectangle(x + w, y + (h - tipH) / 2, tipW, tipH);
+
+        // Fill level
+        var fillW = ((w - 2) * battery / 100).toNumber();
+        if (fillW > 0) {
+            dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+            dc.fillRectangle(x + 1, y + 1, fillW, h - 2);
+        }
+
+        // Percentage text (small, to the left of icon)
+        dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(x - 4, y + h/2, Graphics.FONT_XTINY, battery.format("%d"), Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
     private function drawHeader(dc) {
         // Header - centered single column: temp on top, city below
         var y = 8;  // Moved up
         var center = Theme.getCenter();
 
-        var tempStr = "18°";
-        var locationStr = "Seattle";
-
-        var conditions = Weather.getCurrentConditions();
-        if (conditions != null) {
-            if (conditions.temperature != null) {
-                tempStr = conditions.temperature.format("%d") + "°";
-            }
-            if (conditions.observationLocationName != null) {
-                locationStr = conditions.observationLocationName;
-                if (locationStr.length() > 12) {
-                    locationStr = locationStr.substring(0, 12);
-                }
-            }
-        }
+        // Use cached data from WeatherDataManager
+        var tempStr = WeatherDataManager.currentTemp != null
+            ? WeatherDataManager.currentTemp.format("%d") + "°"
+            : "18°";
+        var locationStr = WeatherDataManager.locationName;
 
         // Temperature on line 1 (centered, brighter)
         dc.setColor(Theme.TIME_PRIMARY, Graphics.COLOR_TRANSPARENT);
@@ -91,77 +138,25 @@ class WatchFaceView extends WatchUi.WatchFace {
         var currentHour = now.hour;
         var dayOfWeek = now.day_of_week;
 
-        // Generate fake weather data
-        var seed = 54321;
-        var temps = new [72];
-        var hours = new [72];
-        var precips = new [72];
-        var clouds = new [72];
-        var winds = new [72];
+        // Use cached weather data from WeatherDataManager
+        var temps = WeatherDataManager.temps;
+        var hours = WeatherDataManager.hours;
+        var precips = WeatherDataManager.precips;
+        var clouds = WeatherDataManager.clouds;
+        var winds = WeatherDataManager.winds;
+        var minTemp = WeatherDataManager.minTemp;
+        var maxTemp = WeatherDataManager.maxTemp;
+        var dayHighs = WeatherDataManager.dayHighs;
+        var dayLows = WeatherDataManager.dayLows;
+        var dayHighIdx = WeatherDataManager.dayHighIdx;
+        var dayLowIdx = WeatherDataManager.dayLowIdx;
 
-        var minTemp = 100.0;
-        var maxTemp = -100.0;
-
-        // Track daily highs/lows for temperature boxes
-        var dayHighs = new [3];
-        var dayLows = new [3];
-        var dayHighIdx = new [3];
-        var dayLowIdx = new [3];
-        for (var d = 0; d < 3; d++) {
-            dayHighs[d] = -100.0;
-            dayLows[d] = 100.0;
-            dayHighIdx[d] = 0;
-            dayLowIdx[d] = 0;
+        // Safety check - if data not yet loaded, skip rendering
+        if (temps == null || hours == null) {
+            return;
         }
 
-        for (var i = 0; i < 72; i++) {
-            seed = ((seed * 9301 + 49297) % 233280);
-            var rand = seed.toFloat() / 233280.0;
-
-            var hour = (currentHour + i) % 24;
-            hours[i] = hour;
-
-            var hourFloat = (hour - 6).toFloat();
-            var tempVariation = Math.sin(hourFloat * 3.14159 / 12.0) * 9.0;
-            var temp = 18.0 + tempVariation + (rand - 0.5) * 2.0;
-            temps[i] = temp;
-
-            if (temp < minTemp) { minTemp = temp; }
-            if (temp > maxTemp) { maxTemp = temp; }
-
-            // Track daily extremes
-            var dayIndex = (currentHour + i) / 24;
-            if (dayIndex < 3) {
-                if (temp > dayHighs[dayIndex]) {
-                    dayHighs[dayIndex] = temp;
-                    dayHighIdx[dayIndex] = i;
-                }
-                if (temp < dayLows[dayIndex]) {
-                    dayLows[dayIndex] = temp;
-                    dayLowIdx[dayIndex] = i;
-                }
-            }
-
-            if ((i > 10 && i < 20) || (i > 42 && i < 52)) {
-                precips[i] = (40 + rand * 40).toNumber();
-            } else {
-                precips[i] = 0;
-            }
-
-            if (precips[i] > 0) {
-                clouds[i] = (75 + rand * 25).toNumber();
-            } else if ((i > 5 && i < 15) || (i > 35 && i < 45)) {
-                clouds[i] = (45 + rand * 35).toNumber();
-            } else {
-                clouds[i] = (10 + rand * 25).toNumber();
-            }
-
-            winds[i] = 10.0 + Math.sin(i.toFloat() * 0.25) * 7.0 + (rand - 0.5) * 5.0;
-        }
-
-        if (maxTemp <= minTemp) { maxTemp = minTemp + 10.0; }
-        var tempRange = maxTemp - minTemp;
-        if (tempRange < 8.0) { tempRange = 10.0; }
+        var tempRange = WeatherDataManager.getTempRange();
 
         // Day/night band at bottom of chart area
         var bandY = chartY + chartHeight - 5;
@@ -173,14 +168,34 @@ class WatchFaceView extends WatchUi.WatchFace {
             dc.fillRectangle(chartX + i, bandY, 2, bandHeight);
         }
 
-        // Clouds at top (simple rectangles for now)
-        for (var i = 0; i < 72; i += 5) {
+        // Clouds at top - organic shapes using overlapping circles
+        for (var i = 0; i < 72; i += 3) {
             var c = clouds[i];
-            if (c > 40) {
+            if (c > 35) {
                 var x = chartX + (i * chartWidth / 72);
-                var opacity = (c - 40).toFloat() / 60.0;
-                dc.setColor(Theme.dimColor(Theme.CLOUD_COLOR, opacity * 0.3), Graphics.COLOR_TRANSPARENT);
-                dc.fillRectangle(x, chartY, 20, 12);
+                var opacity = (c - 35).toFloat() / 65.0;
+                var cloudColor = Theme.dimColor(Theme.CLOUD_COLOR, opacity * 0.35);
+                dc.setColor(cloudColor, Graphics.COLOR_TRANSPARENT);
+
+                // Draw puffy cloud shape with multiple overlapping circles
+                var baseY = chartY + 6;
+                var cloudWidth = 18 + (c / 10);  // Wider clouds for higher coverage
+
+                // Main body - row of circles
+                dc.fillCircle(x + 4, baseY, 4);
+                dc.fillCircle(x + 10, baseY, 5);
+                dc.fillCircle(x + 17, baseY, 4);
+
+                // Top puffs - slightly higher
+                if (c > 50) {
+                    dc.fillCircle(x + 7, baseY - 3, 3);
+                    dc.fillCircle(x + 13, baseY - 3, 3);
+                }
+
+                // Extra puffs for very cloudy
+                if (c > 70) {
+                    dc.fillCircle(x + 10, baseY - 5, 2);
+                }
             }
         }
 
@@ -209,14 +224,14 @@ class WatchFaceView extends WatchUi.WatchFace {
         }
         dc.setPenWidth(1);
 
-        // Wind line (subtle)
-        dc.setColor(Theme.dimColor(Theme.WIND_SPEED, 0.4), Graphics.COLOR_TRANSPARENT);
+        // Wind line (subtle but visible)
+        dc.setColor(Theme.dimColor(Theme.WIND_SPEED, 0.5), Graphics.COLOR_TRANSPARENT);
         prevX = -1;
         var prevWindY = -1;
 
         for (var i = 0; i < 72; i++) {
             var x = chartX + (i * chartWidth / 72);
-            var norm = winds[i] / 30.0;
+            var norm = winds[i] / 20.0;  // Lower ceiling for typical wind speeds 5-15 km/h
             if (norm > 1.0) { norm = 1.0; }
             var y = tempYStart + 2 + (tempHeight - 4) - (norm * (tempHeight - 4));
 
@@ -227,22 +242,28 @@ class WatchFaceView extends WatchUi.WatchFace {
             prevWindY = y.toNumber();
         }
 
-        // Precipitation bars
-        dc.setColor(Theme.PRECIPITATION, Graphics.COLOR_TRANSPARENT);
-        var precipBaseY = chartY + chartHeight - 8;
+        // Precipitation bars - draw from bottom of chart, upward
+        var precipBaseY = chartY + chartHeight - 12;  // Above the day/night band
 
-        for (var i = 0; i < 72; i += 2) {
-            if (precips[i] > 15) {
+        for (var i = 0; i < 72; i++) {
+            var precipChance = precips[i];
+            if (precipChance > 5) {  // Lower threshold from 15% to 5%
                 var x = chartX + (i * chartWidth / 72);
-                var h = (precips[i] * 14 / 100);
-                if (h < 2) { h = 2; }
-                dc.fillRectangle(x, precipBaseY - h, 3, h);
+                // Scale height: 5% = 2px, 100% = 20px
+                // FIXED: Use float division to avoid integer truncation (18/95=0)
+                var h = (2 + (precipChance - 5).toFloat() * 18.0 / 95.0).toNumber();
+                if (h > 20) { h = 20; }
+
+                // Color intensity based on chance
+                var intensity = 0.4 + (precipChance / 100.0) * 0.6;
+                dc.setColor(Theme.dimColor(Theme.PRECIPITATION, intensity), Graphics.COLOR_TRANSPARENT);
+                dc.fillRectangle(x, precipBaseY - h, 3, h);  // 3px bars to fit 72 hours
             }
         }
 
         // Day separators (dotted lines at midnight)
         var days = ["S", "M", "T", "W", "T", "F", "S"];  // Single letters
-        var dayLabelY = chartY + chartHeight + 1;  // Closer to chart
+        var dayLabelY = chartY + chartHeight + 3;  // Below chart with spacing
 
         for (var i = 6; i < 72; i += 6) {
             var hour = (currentHour + i) % 24;
@@ -399,21 +420,28 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         var timeStr = hour.format("%d") + ":" + min.format("%02d");
 
-        var stepProgress = 0.72;
-        var actInfo = ActivityMonitor.getInfo();
-        if (actInfo != null && actInfo.steps != null && actInfo.stepGoal != null) {
-            if (actInfo.stepGoal > 0 && actInfo.steps > 0) {
+        var stepProgress = 0.0;
+        if (DEBUG_SIMULATOR) {
+            // Use debug values for simulator testing
+            stepProgress = DEBUG_STEPS.toFloat() / DEBUG_STEP_GOAL.toFloat();
+        } else {
+            var actInfo = ActivityMonitor.getInfo();
+            if (actInfo != null && actInfo.steps != null && actInfo.stepGoal != null && actInfo.stepGoal > 0) {
                 stepProgress = actInfo.steps.toFloat() / actInfo.stepGoal.toFloat();
-                if (stepProgress > 1.0) { stepProgress = 1.0; }
             }
         }
+        if (stepProgress > 1.0) { stepProgress = 1.0; }
 
         var timeFont = Graphics.FONT_NUMBER_HOT;
         var fontHeight = dc.getFontHeight(timeFont);
 
         var textTop = baseY - (fontHeight / 2);
         var textBottom = baseY + (fontHeight / 2);
-        var fillPixels = (fontHeight * stepProgress).toNumber();
+        // Scale progress by 1.5x so visual fill matches perceived completion
+        // (digit pixels are mostly in upper 70% of font height, so 30% real = ~5% visible)
+        var scaledProgress = stepProgress * 1.5;
+        if (scaledProgress > 1.0) { scaledProgress = 1.0; }
+        var fillPixels = (fontHeight * scaledProgress).toNumber();
         var fillY = textBottom - fillPixels;
 
         if (fontHeight > fillPixels) {
@@ -453,33 +481,81 @@ class WatchFaceView extends WatchUi.WatchFace {
         var ringsX = center - 70;
         var ringsY = 370;
         var stroke = 4;
-        var outerR = 32;   // Steps (outer)
-        var middleR = 24;  // Floors (middle)
-        var innerR = 16;   // Body Battery (inner)
+        var outerR = 34;   // Steps (outer)
+        var middleR = 26;  // Floors (middle)
+        var innerR = 18;   // Body Battery (inner)
 
-        var currentSteps = 7700;
-        var stepsProgress = 0.77;
-        var currentFloors = 32;
-        var floorsProgress = 0.80;
-        var bodyBattery = 65;
-        var bodyBatteryProgress = 0.65;
-        var currentHR = 72;
+        var currentSteps = 0;
+        var stepsProgress = 0.0;
+        var currentFloors = 0;
+        var floorsProgress = 0.0;
+        var bodyBattery = 0;
+        var bodyBatteryProgress = 0.0;
+        var currentHR = 0;
 
-        var actInfo = ActivityMonitor.getInfo();
-        if (actInfo != null) {
-            if (actInfo.steps != null && actInfo.steps > 0) {
-                currentSteps = actInfo.steps;
+        if (DEBUG_SIMULATOR) {
+            // Use debug values for simulator testing
+            currentSteps = DEBUG_STEPS;
+            stepsProgress = DEBUG_STEPS.toFloat() / DEBUG_STEP_GOAL.toFloat();
+            if (stepsProgress > 1.0) { stepsProgress = 1.0; }
+
+            currentFloors = DEBUG_FLOORS;
+            floorsProgress = DEBUG_FLOORS.toFloat() / DEBUG_FLOOR_GOAL.toFloat();
+            if (floorsProgress > 1.0) { floorsProgress = 1.0; }
+
+            bodyBattery = DEBUG_BODY_BATTERY;
+            bodyBatteryProgress = bodyBattery / 100.0;
+
+            currentHR = DEBUG_HR;
+        } else {
+            // Get Heart Rate from Activity (live during workout) or ActivityMonitor (resting)
+            var activityInfo = Activity.getActivityInfo();
+            if (activityInfo != null && activityInfo.currentHeartRate != null) {
+                currentHR = activityInfo.currentHeartRate;
+            } else {
+                // Try to get latest HR from history
+                var hrIterator = ActivityMonitor.getHeartRateHistory(1, true);
+                if (hrIterator != null) {
+                    var hrSample = hrIterator.next();
+                    if (hrSample != null && hrSample.heartRate != null && hrSample.heartRate != ActivityMonitor.INVALID_HR_SAMPLE) {
+                        currentHR = hrSample.heartRate;
+                    }
+                }
+            }
+
+            // Get Body Battery from SensorHistory
+            if (Toybox has :SensorHistory && SensorHistory has :getBodyBatteryHistory) {
+                var bbIterator = SensorHistory.getBodyBatteryHistory({:period => 1, :order => SensorHistory.ORDER_NEWEST_FIRST});
+                if (bbIterator != null) {
+                    var bbSample = bbIterator.next();
+                    if (bbSample != null && bbSample.data != null) {
+                        bodyBattery = bbSample.data.toNumber();
+                        bodyBatteryProgress = bodyBattery / 100.0;
+                    }
+                }
+            }
+
+            var actInfo = ActivityMonitor.getInfo();
+            if (actInfo != null) {
+                // Steps
+                if (actInfo.steps != null) {
+                    currentSteps = actInfo.steps;
+                }
                 if (actInfo.stepGoal != null && actInfo.stepGoal > 0) {
                     stepsProgress = currentSteps.toFloat() / actInfo.stepGoal.toFloat();
                     if (stepsProgress > 1.0) { stepsProgress = 1.0; }
                 }
-            }
-            if (actInfo.floorsClimbed != null && actInfo.floorsClimbed > 0) {
-                currentFloors = actInfo.floorsClimbed;
-                if (actInfo.floorsClimbedGoal != null && actInfo.floorsClimbedGoal > 0) {
-                    floorsProgress = currentFloors.toFloat() / actInfo.floorsClimbedGoal.toFloat();
-                    if (floorsProgress > 1.0) { floorsProgress = 1.0; }
+
+                // Floors - default goal to 10 if not set
+                if (actInfo.floorsClimbed != null) {
+                    currentFloors = actInfo.floorsClimbed;
                 }
+                var floorGoal = 10;  // Default goal
+                if (actInfo.floorsClimbedGoal != null && actInfo.floorsClimbedGoal > 0) {
+                    floorGoal = actInfo.floorsClimbedGoal;
+                }
+                floorsProgress = currentFloors.toFloat() / floorGoal.toFloat();
+                if (floorsProgress > 1.0) { floorsProgress = 1.0; }
             }
         }
 
@@ -513,60 +589,60 @@ class WatchFaceView extends WatchUi.WatchFace {
         dc.drawText(tzX, tzY + 26, Graphics.FONT_XTINY, "UTC", Graphics.TEXT_JUSTIFY_CENTER);
     }
 
-    // Mini-digit renderer: draws 6x8 pixel digits
+    // Mini-digit renderer: draws 8x10 pixel digits
     private function drawMiniDigit(dc, x, y, digit, color) {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        // Each digit is 6px wide, 8px tall
+        // Each digit is 8px wide, 10px tall
         if (digit == 0) {
-            dc.fillRectangle(x+1, y, 4, 1);    // top
-            dc.fillRectangle(x+1, y+7, 4, 1);  // bottom
-            dc.fillRectangle(x, y+1, 1, 6);    // left
-            dc.fillRectangle(x+5, y+1, 1, 6);  // right
+            dc.fillRectangle(x+1, y, 6, 1);    // top
+            dc.fillRectangle(x+1, y+9, 6, 1);  // bottom
+            dc.fillRectangle(x, y+1, 1, 8);    // left
+            dc.fillRectangle(x+7, y+1, 1, 8);  // right
         } else if (digit == 1) {
-            dc.fillRectangle(x+3, y, 1, 8);    // center vertical
-            dc.fillRectangle(x+2, y+1, 1, 1);  // top left tick
+            dc.fillRectangle(x+4, y, 1, 10);   // center vertical
+            dc.fillRectangle(x+3, y+1, 1, 1);  // top left tick
         } else if (digit == 2) {
-            dc.fillRectangle(x, y, 6, 1);      // top
-            dc.fillRectangle(x+5, y+1, 1, 2);  // right upper
-            dc.fillRectangle(x+1, y+3, 4, 1);  // middle
-            dc.fillRectangle(x, y+4, 1, 3);    // left lower
-            dc.fillRectangle(x, y+7, 6, 1);    // bottom
+            dc.fillRectangle(x, y, 8, 1);      // top
+            dc.fillRectangle(x+7, y+1, 1, 3);  // right upper
+            dc.fillRectangle(x+1, y+4, 6, 1);  // middle
+            dc.fillRectangle(x, y+5, 1, 4);    // left lower
+            dc.fillRectangle(x, y+9, 8, 1);    // bottom
         } else if (digit == 3) {
-            dc.fillRectangle(x, y, 6, 1);      // top
-            dc.fillRectangle(x+5, y+1, 1, 6);  // right
-            dc.fillRectangle(x+1, y+3, 4, 1);  // middle
-            dc.fillRectangle(x, y+7, 6, 1);    // bottom
+            dc.fillRectangle(x, y, 8, 1);      // top
+            dc.fillRectangle(x+7, y+1, 1, 8);  // right
+            dc.fillRectangle(x+1, y+4, 6, 1);  // middle
+            dc.fillRectangle(x, y+9, 8, 1);    // bottom
         } else if (digit == 4) {
-            dc.fillRectangle(x, y, 1, 4);      // left upper
-            dc.fillRectangle(x, y+3, 6, 1);    // middle
-            dc.fillRectangle(x+5, y, 1, 8);    // right
+            dc.fillRectangle(x, y, 1, 5);      // left upper
+            dc.fillRectangle(x, y+4, 8, 1);    // middle
+            dc.fillRectangle(x+7, y, 1, 10);   // right
         } else if (digit == 5) {
-            dc.fillRectangle(x, y, 6, 1);      // top
-            dc.fillRectangle(x, y+1, 1, 2);    // left upper
-            dc.fillRectangle(x, y+3, 6, 1);    // middle
-            dc.fillRectangle(x+5, y+4, 1, 3);  // right lower
-            dc.fillRectangle(x, y+7, 6, 1);    // bottom
+            dc.fillRectangle(x, y, 8, 1);      // top
+            dc.fillRectangle(x, y+1, 1, 3);    // left upper
+            dc.fillRectangle(x, y+4, 8, 1);    // middle
+            dc.fillRectangle(x+7, y+5, 1, 4);  // right lower
+            dc.fillRectangle(x, y+9, 8, 1);    // bottom
         } else if (digit == 6) {
-            dc.fillRectangle(x+1, y, 5, 1);    // top
-            dc.fillRectangle(x, y+1, 1, 6);    // left
-            dc.fillRectangle(x+1, y+3, 5, 1);  // middle
-            dc.fillRectangle(x+5, y+4, 1, 3);  // right lower
-            dc.fillRectangle(x+1, y+7, 4, 1);  // bottom
+            dc.fillRectangle(x+1, y, 7, 1);    // top
+            dc.fillRectangle(x, y+1, 1, 8);    // left
+            dc.fillRectangle(x+1, y+4, 7, 1);  // middle
+            dc.fillRectangle(x+7, y+5, 1, 4);  // right lower
+            dc.fillRectangle(x+1, y+9, 6, 1);  // bottom
         } else if (digit == 7) {
-            dc.fillRectangle(x, y, 6, 1);      // top
-            dc.fillRectangle(x+5, y+1, 1, 7);  // right
+            dc.fillRectangle(x, y, 8, 1);      // top
+            dc.fillRectangle(x+7, y+1, 1, 9);  // right
         } else if (digit == 8) {
-            dc.fillRectangle(x+1, y, 4, 1);    // top
-            dc.fillRectangle(x+1, y+3, 4, 1);  // middle
-            dc.fillRectangle(x+1, y+7, 4, 1);  // bottom
-            dc.fillRectangle(x, y+1, 1, 6);    // left
-            dc.fillRectangle(x+5, y+1, 1, 6);  // right
+            dc.fillRectangle(x+1, y, 6, 1);    // top
+            dc.fillRectangle(x+1, y+4, 6, 1);  // middle
+            dc.fillRectangle(x+1, y+9, 6, 1);  // bottom
+            dc.fillRectangle(x, y+1, 1, 8);    // left
+            dc.fillRectangle(x+7, y+1, 1, 8);  // right
         } else if (digit == 9) {
-            dc.fillRectangle(x+1, y, 4, 1);    // top
-            dc.fillRectangle(x, y+1, 1, 2);    // left upper
-            dc.fillRectangle(x+1, y+3, 5, 1);  // middle
-            dc.fillRectangle(x+5, y+1, 1, 6);  // right
-            dc.fillRectangle(x, y+7, 5, 1);    // bottom
+            dc.fillRectangle(x+1, y, 6, 1);    // top
+            dc.fillRectangle(x, y+1, 1, 3);    // left upper
+            dc.fillRectangle(x+1, y+4, 7, 1);  // middle
+            dc.fillRectangle(x+7, y+1, 1, 8);  // right
+            dc.fillRectangle(x, y+9, 7, 1);    // bottom
         }
     }
 
@@ -577,16 +653,16 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         var str = number.format("%d");
         var len = str.length();
-        var digitWidth = 7;  // 6px digit + 1px gap
-        var minusWidth = isNegative ? 5 : 0;  // 4px minus + 1px gap
+        var digitWidth = 9;  // 8px digit + 1px gap
+        var minusWidth = isNegative ? 7 : 0;  // 6px minus + 1px gap
         var totalWidth = minusWidth + len * digitWidth - 1;
         var startX = centerX - totalWidth / 2;
-        var startY = centerY - 4;  // Center vertically (8px tall / 2)
+        var startY = centerY - 5;  // Center vertically (10px tall / 2)
 
         // Draw minus sign if negative
         if (isNegative) {
             dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle(startX, startY + 3, 4, 1);  // Horizontal minus
+            dc.fillRectangle(startX, startY + 4, 6, 1);  // Horizontal minus
             startX = startX + minusWidth;
         }
 
@@ -597,52 +673,54 @@ class WatchFaceView extends WatchUi.WatchFace {
         }
     }
 
-    // Draw mini letter for day labels (6x8 pixels)
+    // Draw mini letter for day labels (8x10 pixels)
     private function drawMiniLetter(dc, x, y, letter, color) {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        // 6x8 pixel letters
+        // 8x10 pixel letters
         if (letter.equals("M")) {
-            dc.fillRectangle(x, y, 1, 8);      // left
-            dc.fillRectangle(x+5, y, 1, 8);    // right
+            dc.fillRectangle(x, y, 1, 10);     // left
+            dc.fillRectangle(x+7, y, 1, 10);   // right
             dc.fillRectangle(x+1, y+1, 1, 2);  // left inner
-            dc.fillRectangle(x+4, y+1, 1, 2);  // right inner
-            dc.fillRectangle(x+2, y+2, 2, 1);  // center
+            dc.fillRectangle(x+6, y+1, 1, 2);  // right inner
+            dc.fillRectangle(x+2, y+2, 4, 1);  // center
         } else if (letter.equals("T")) {
-            dc.fillRectangle(x, y, 6, 1);      // top
-            dc.fillRectangle(x+2, y+1, 2, 7);  // center
+            dc.fillRectangle(x, y, 8, 1);      // top
+            dc.fillRectangle(x+3, y+1, 2, 9);  // center
         } else if (letter.equals("W")) {
-            dc.fillRectangle(x, y, 1, 8);      // left
-            dc.fillRectangle(x+5, y, 1, 8);    // right
-            dc.fillRectangle(x+2, y+5, 2, 2);  // center
-            dc.fillRectangle(x+1, y+6, 1, 1);  // left inner
-            dc.fillRectangle(x+4, y+6, 1, 1);  // right inner
+            dc.fillRectangle(x, y, 1, 10);     // left
+            dc.fillRectangle(x+7, y, 1, 10);   // right
+            dc.fillRectangle(x+3, y+5, 2, 4);  // center
+            dc.fillRectangle(x+1, y+8, 2, 1);  // left inner
+            dc.fillRectangle(x+5, y+8, 2, 1);  // right inner
         } else if (letter.equals("F")) {
-            dc.fillRectangle(x, y, 6, 1);      // top
-            dc.fillRectangle(x, y+1, 1, 7);    // left
-            dc.fillRectangle(x+1, y+3, 4, 1);  // middle
+            dc.fillRectangle(x, y, 8, 1);      // top
+            dc.fillRectangle(x, y+1, 1, 9);    // left
+            dc.fillRectangle(x+1, y+4, 5, 1);  // middle
         } else if (letter.equals("S")) {
-            dc.fillRectangle(x+1, y, 5, 1);    // top
-            dc.fillRectangle(x, y+1, 1, 2);    // left upper
-            dc.fillRectangle(x+1, y+3, 4, 1);  // middle
-            dc.fillRectangle(x+5, y+4, 1, 3);  // right lower
-            dc.fillRectangle(x, y+7, 5, 1);    // bottom
+            dc.fillRectangle(x+1, y, 7, 1);    // top
+            dc.fillRectangle(x, y+1, 1, 3);    // left upper
+            dc.fillRectangle(x+1, y+4, 6, 1);  // middle
+            dc.fillRectangle(x+7, y+5, 1, 4);  // right lower
+            dc.fillRectangle(x, y+9, 7, 1);    // bottom
         } else if (letter.equals("U")) {
-            dc.fillRectangle(x, y, 1, 7);      // left
-            dc.fillRectangle(x+5, y, 1, 7);    // right
-            dc.fillRectangle(x+1, y+7, 4, 1);  // bottom
+            dc.fillRectangle(x, y, 1, 9);      // left
+            dc.fillRectangle(x+7, y, 1, 9);    // right
+            dc.fillRectangle(x+1, y+9, 6, 1);  // bottom
         } else if (letter.equals("C")) {
-            dc.fillRectangle(x+1, y, 5, 1);    // top
-            dc.fillRectangle(x, y+1, 1, 6);    // left
-            dc.fillRectangle(x+1, y+7, 5, 1);  // bottom
+            dc.fillRectangle(x+1, y, 7, 1);    // top
+            dc.fillRectangle(x, y+1, 1, 8);    // left
+            dc.fillRectangle(x+1, y+9, 7, 1);  // bottom
         }
     }
 
     private function drawRing(dc, x, y, radius, stroke, progress, color) {
         dc.setPenWidth(stroke);
 
-        dc.setColor(Theme.dimColor(color, 0.25), Graphics.COLOR_TRANSPARENT);
+        // Background ring - brightened from 0.25 to 0.35
+        dc.setColor(Theme.dimColor(color, 0.35), Graphics.COLOR_TRANSPARENT);
         dc.drawArc(x, y, radius, Graphics.ARC_CLOCKWISE, 90, -270);
 
+        // Progress arc
         if (progress > 0.01) {
             var sweepDeg = (progress * 360).toNumber();
             if (sweepDeg > 360) { sweepDeg = 360; }
@@ -664,9 +742,24 @@ class WatchFaceView extends WatchUi.WatchFace {
             if (hour == 0) { hour = 12; }
         }
 
+        // Time (center)
         dc.setColor(Theme.AOD_TIME, Graphics.COLOR_TRANSPARENT);
         dc.drawText(center, Theme.screenHeight / 2, Graphics.FONT_NUMBER_MILD,
             hour.format("%d") + ":" + min.format("%02d"),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Date (below time)
+        var now = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
+        var dayNames = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+        dc.setColor(Theme.AOD_TEXT, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(center, Theme.screenHeight / 2 + 45, Graphics.FONT_XTINY,
+            dayNames[now.day_of_week - 1] + " " + now.day,
+            Graphics.TEXT_JUSTIFY_CENTER);
+
+        // Battery (top right, minimal)
+        var battery = System.getSystemStats().battery.toNumber();
+        dc.drawText(Theme.screenWidth - 20, 15, Graphics.FONT_XTINY,
+            battery.format("%d") + "%",
+            Graphics.TEXT_JUSTIFY_RIGHT);
     }
 }
