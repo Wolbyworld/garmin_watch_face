@@ -1,9 +1,200 @@
 <?xml version="1.0" encoding="utf-8"?>
 <settings>
-    <setting propertyKey="@Properties.secondTimezoneName" title="@Strings.secondTzName">
-        <settingConfig type="alphaNumeric" maxLength="4" />
+    <!-- Time & Date -->
+    <setting propertyKey="@Properties.clockFormat" title="@Strings.clockFormat">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.clockFormat12h</listEntry>
+            <listEntry value="1">@Strings.clockFormat24h</listEntry>
+            <listEntry value="2">@Strings.clockFormatSystem</listEntry>
+        </settingConfig>
     </setting>
-    <setting propertyKey="@Properties.secondTimezoneOffset" title="@Strings.secondTzOffset">
-        <settingConfig type="numeric" min="-12" max="14" />
+    <setting propertyKey="@Properties.showSeconds" title="@Strings.showSeconds">
+        <settingConfig type="boolean" />
+    </setting>
+    <setting propertyKey="@Properties.dateFormat" title="@Strings.dateFormat">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.dateFormatWedJan15</listEntry>
+            <listEntry value="1">@Strings.dateFormat15JanWed</listEntry>
+            <listEntry value="2">@Strings.dateFormatJan15</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.showWeekNumber" title="@Strings.showWeekNumber">
+        <settingConfig type="boolean" />
+    </setting>
+
+    <!-- World Clocks -->
+    <setting propertyKey="@Properties.worldClockCount" title="@Strings.worldClockCount">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.worldClockOff</listEntry>
+            <listEntry value="1">@Strings.worldClockOne</listEntry>
+            <listEntry value="2">@Strings.worldClockTwo</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.timezone1" title="@Strings.timezone1">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.cityNYC</listEntry>
+            <listEntry value="1">@Strings.cityLAX</listEntry>
+            <listEntry value="2">@Strings.cityCHI</listEntry>
+            <listEntry value="3">@Strings.cityDEN</listEntry>
+            <listEntry value="4">@Strings.citySAO</listEntry>
+            <listEntry value="5">@Strings.cityMEX</listEntry>
+            <listEntry value="6">@Strings.cityLON</listEntry>
+            <listEntry value="7">@Strings.cityPAR</listEntry>
+            <listEntry value="8">@Strings.cityBER</listEntry>
+            <listEntry value="9">@Strings.cityMAD</listEntry>
+            <listEntry value="10">@Strings.cityROM</listEntry>
+            <listEntry value="11">@Strings.cityAMS</listEntry>
+            <listEntry value="12">@Strings.cityMOS</listEntry>
+            <listEntry value="13">@Strings.cityDUB</listEntry>
+            <listEntry value="14">@Strings.cityMUM</listEntry>
+            <listEntry value="15">@Strings.citySIN</listEntry>
+            <listEntry value="16">@Strings.cityHKG</listEntry>
+            <listEntry value="17">@Strings.cityTYO</listEntry>
+            <listEntry value="18">@Strings.citySEL</listEntry>
+            <listEntry value="19">@Strings.citySYD</listEntry>
+            <listEntry value="20">@Strings.cityAKL</listEntry>
+            <listEntry value="21">@Strings.cityHNL</listEntry>
+            <listEntry value="22">@Strings.cityANC</listEntry>
+            <listEntry value="23">@Strings.cityTOR</listEntry>
+            <listEntry value="24">@Strings.cityVAN</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.timezone2" title="@Strings.timezone2">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.cityNYC</listEntry>
+            <listEntry value="1">@Strings.cityLAX</listEntry>
+            <listEntry value="2">@Strings.cityCHI</listEntry>
+            <listEntry value="3">@Strings.cityDEN</listEntry>
+            <listEntry value="4">@Strings.citySAO</listEntry>
+            <listEntry value="5">@Strings.cityMEX</listEntry>
+            <listEntry value="6">@Strings.cityLON</listEntry>
+            <listEntry value="7">@Strings.cityPAR</listEntry>
+            <listEntry value="8">@Strings.cityBER</listEntry>
+            <listEntry value="9">@Strings.cityMAD</listEntry>
+            <listEntry value="10">@Strings.cityROM</listEntry>
+            <listEntry value="11">@Strings.cityAMS</listEntry>
+            <listEntry value="12">@Strings.cityMOS</listEntry>
+            <listEntry value="13">@Strings.cityDUB</listEntry>
+            <listEntry value="14">@Strings.cityMUM</listEntry>
+            <listEntry value="15">@Strings.citySIN</listEntry>
+            <listEntry value="16">@Strings.cityHKG</listEntry>
+            <listEntry value="17">@Strings.cityTYO</listEntry>
+            <listEntry value="18">@Strings.citySEL</listEntry>
+            <listEntry value="19">@Strings.citySYD</listEntry>
+            <listEntry value="20">@Strings.cityAKL</listEntry>
+            <listEntry value="21">@Strings.cityHNL</listEntry>
+            <listEntry value="22">@Strings.cityANC</listEntry>
+            <listEntry value="23">@Strings.cityTOR</listEntry>
+            <listEntry value="24">@Strings.cityVAN</listEntry>
+        </settingConfig>
+    </setting>
+
+    <!-- Weather Chart -->
+    <setting propertyKey="@Properties.showWeatherChart" title="@Strings.showWeatherChart">
+        <settingConfig type="boolean" />
+    </setting>
+    <setting propertyKey="@Properties.showTemperature" title="@Strings.showTemperature">
+        <settingConfig type="boolean" />
+    </setting>
+    <setting propertyKey="@Properties.showPrecipitation" title="@Strings.showPrecipitation">
+        <settingConfig type="boolean" />
+    </setting>
+    <setting propertyKey="@Properties.showClouds" title="@Strings.showClouds">
+        <settingConfig type="boolean" />
+    </setting>
+    <setting propertyKey="@Properties.showWind" title="@Strings.showWind">
+        <settingConfig type="boolean" />
+    </setting>
+    <setting propertyKey="@Properties.temperatureUnit" title="@Strings.temperatureUnit">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.tempCelsius</listEntry>
+            <listEntry value="1">@Strings.tempFahrenheit</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.forecastHours" title="@Strings.forecastHours">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.forecast48h</listEntry>
+            <listEntry value="1">@Strings.forecast72h</listEntry>
+        </settingConfig>
+    </setting>
+
+    <!-- Activity Rings -->
+    <setting propertyKey="@Properties.ringLayout" title="@Strings.ringLayout">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.ringLayoutAll</listEntry>
+            <listEntry value="1">@Strings.ringLayout2</listEntry>
+            <listEntry value="2">@Strings.ringLayoutOff</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.outerRing" title="@Strings.outerRing">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.dataSteps</listEntry>
+            <listEntry value="1">@Strings.dataFloors</listEntry>
+            <listEntry value="2">@Strings.dataBodyBattery</listEntry>
+            <listEntry value="3">@Strings.dataHR</listEntry>
+            <listEntry value="4">@Strings.dataOff</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.middleRing" title="@Strings.middleRing">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.dataSteps</listEntry>
+            <listEntry value="1">@Strings.dataFloors</listEntry>
+            <listEntry value="2">@Strings.dataBodyBattery</listEntry>
+            <listEntry value="3">@Strings.dataHR</listEntry>
+            <listEntry value="4">@Strings.dataOff</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.innerRing" title="@Strings.innerRing">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.dataSteps</listEntry>
+            <listEntry value="1">@Strings.dataFloors</listEntry>
+            <listEntry value="2">@Strings.dataBodyBattery</listEntry>
+            <listEntry value="3">@Strings.dataHR</listEntry>
+            <listEntry value="4">@Strings.dataOff</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.centerData" title="@Strings.centerData">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.dataSteps</listEntry>
+            <listEntry value="1">@Strings.dataHR</listEntry>
+            <listEntry value="2">@Strings.dataOff</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.showRingIcons" title="@Strings.showRingIcons">
+        <settingConfig type="boolean" />
+    </setting>
+
+    <!-- Appearance -->
+    <setting propertyKey="@Properties.theme" title="@Strings.theme">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.themeDark</listEntry>
+            <listEntry value="1">@Strings.themeWarm</listEntry>
+            <listEntry value="2">@Strings.themeCool</listEntry>
+            <listEntry value="3">@Strings.themeHighContrast</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.accentColor" title="@Strings.accentColor">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.accentTeal</listEntry>
+            <listEntry value="1">@Strings.accentOrange</listEntry>
+            <listEntry value="2">@Strings.accentBlue</listEntry>
+            <listEntry value="3">@Strings.accentPurple</listEntry>
+            <listEntry value="4">@Strings.accentRed</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.timeColor" title="@Strings.timeColor">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.timeWhite</listEntry>
+            <listEntry value="1">@Strings.timeWarmWhite</listEntry>
+            <listEntry value="2">@Strings.timeCoolWhite</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.showBattery" title="@Strings.showBattery">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.batteryAlways</listEntry>
+            <listEntry value="1">@Strings.batteryBelow50</listEntry>
+            <listEntry value="2">@Strings.batteryBelow20</listEntry>
+            <listEntry value="3">@Strings.batteryOff</listEntry>
+        </settingConfig>
     </setting>
 </settings>

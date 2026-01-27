@@ -37,6 +37,9 @@ class WatchFaceView extends WatchUi.WatchFace {
     function onUpdate(dc) {
         Theme.initLayout(dc);
 
+        // Apply theme from settings
+        Theme.applyTheme(Settings.getTheme(), Settings.getAccentColor(), Settings.getTimeColor());
+
         dc.setColor(Theme.BG, Theme.BG);
         dc.clear();
 
@@ -50,7 +53,9 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         drawBattery(dc);
         drawHeader(dc);
-        drawWeatherChart(dc);
+        if (Settings.isShowWeatherChart()) {
+            drawWeatherChart(dc);
+        }
         drawDate(dc);
         drawTime(dc);
         drawStats(dc);
@@ -69,6 +74,11 @@ class WatchFaceView extends WatchUi.WatchFace {
     private function drawBattery(dc) {
         var stats = System.getSystemStats();
         var battery = stats.battery.toNumber();
+
+        // Check if we should show battery based on settings
+        if (!Settings.shouldShowBattery(battery)) {
+            return;
+        }
 
         // Position: top-right corner
         var x = Theme.screenWidth - 38;
@@ -109,12 +119,12 @@ class WatchFaceView extends WatchUi.WatchFace {
 
     private function drawHeader(dc) {
         // Header - centered single column: temp on top, city below
-        var y = 8;  // Moved up
         var center = Theme.getCenter();
 
         // Use cached data from WeatherDataManager
-        var tempStr = WeatherDataManager.currentTemp != null
-            ? WeatherDataManager.currentTemp.format("%d") + "°"
+        var temp = WeatherDataManager.currentTemp;
+        var tempStr = temp != null
+            ? Settings.getDisplayTemp(temp).format("%d") + "°"
             : "18°";
         var locationStr = WeatherDataManager.locationName;
 
@@ -132,7 +142,7 @@ class WatchFaceView extends WatchUi.WatchFace {
         var chartX = 45;
         var chartY = 70;
         var chartWidth = Theme.screenWidth - 90;
-        var chartHeight = 80;  // Reduced to make room for day labels below
+        var chartHeight = 80;
 
         var now = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
         var currentHour = now.hour;
@@ -157,120 +167,128 @@ class WatchFaceView extends WatchUi.WatchFace {
         }
 
         var tempRange = WeatherDataManager.getTempRange();
+        var forecastHours = Settings.getForecastHours();
 
         // Day/night band at bottom of chart area
         var bandY = chartY + chartHeight - 5;
         var bandHeight = 6;
         for (var i = 0; i < chartWidth; i += 2) {
-            var idx = (i * 72 / chartWidth);
+            var idx = (i * forecastHours / chartWidth);
+            if (idx >= forecastHours) { idx = forecastHours - 1; }
             if (idx >= 72) { idx = 71; }
             dc.setColor(Theme.getSkyColor(hours[idx]), Graphics.COLOR_TRANSPARENT);
             dc.fillRectangle(chartX + i, bandY, 2, bandHeight);
         }
 
         // Clouds at top - organic shapes using overlapping circles
-        for (var i = 0; i < 72; i += 3) {
-            var c = clouds[i];
-            if (c > 35) {
-                var x = chartX + (i * chartWidth / 72);
-                var opacity = (c - 35).toFloat() / 65.0;
-                var cloudColor = Theme.dimColor(Theme.CLOUD_COLOR, opacity * 0.35);
-                dc.setColor(cloudColor, Graphics.COLOR_TRANSPARENT);
+        if (Settings.isShowClouds()) {
+            for (var i = 0; i < forecastHours && i < 72; i += 3) {
+                var c = clouds[i];
+                if (c > 35) {
+                    var x = chartX + (i * chartWidth / forecastHours);
+                    var opacity = (c - 35).toFloat() / 65.0;
+                    var cloudColor = Theme.dimColor(Theme.CLOUD_COLOR, opacity * 0.35);
+                    dc.setColor(cloudColor, Graphics.COLOR_TRANSPARENT);
 
-                // Draw puffy cloud shape with multiple overlapping circles
-                var baseY = chartY + 6;
-                var cloudWidth = 18 + (c / 10);  // Wider clouds for higher coverage
+                    // Draw puffy cloud shape with multiple overlapping circles
+                    var baseY = chartY + 6;
 
-                // Main body - row of circles
-                dc.fillCircle(x + 4, baseY, 4);
-                dc.fillCircle(x + 10, baseY, 5);
-                dc.fillCircle(x + 17, baseY, 4);
+                    // Main body - row of circles
+                    dc.fillCircle(x + 4, baseY, 4);
+                    dc.fillCircle(x + 10, baseY, 5);
+                    dc.fillCircle(x + 17, baseY, 4);
 
-                // Top puffs - slightly higher
-                if (c > 50) {
-                    dc.fillCircle(x + 7, baseY - 3, 3);
-                    dc.fillCircle(x + 13, baseY - 3, 3);
-                }
+                    // Top puffs - slightly higher
+                    if (c > 50) {
+                        dc.fillCircle(x + 7, baseY - 3, 3);
+                        dc.fillCircle(x + 13, baseY - 3, 3);
+                    }
 
-                // Extra puffs for very cloudy
-                if (c > 70) {
-                    dc.fillCircle(x + 10, baseY - 5, 2);
+                    // Extra puffs for very cloudy
+                    if (c > 70) {
+                        dc.fillCircle(x + 10, baseY - 5, 2);
+                    }
                 }
             }
         }
 
         // Temperature curve
-        var tempYStart = chartY + 10;
-        var tempHeight = chartHeight - 25;
+        if (Settings.isShowTemperature()) {
+            var tempYStart = chartY + 10;
+            var tempHeight = chartHeight - 25;
 
-        dc.setColor(Theme.TEMP_CURVE, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(2);
+            dc.setColor(Theme.TEMP_CURVE, Graphics.COLOR_TRANSPARENT);
+            dc.setPenWidth(2);
 
-        var prevX = -1;
-        var prevTempY = -1;
+            var prevX = -1;
+            var prevTempY = -1;
 
-        for (var i = 0; i < 72; i++) {
-            var x = chartX + (i * chartWidth / 72);
-            var norm = (temps[i] - minTemp) / tempRange;
-            if (norm < 0.0) { norm = 0.0; }
-            if (norm > 1.0) { norm = 1.0; }
-            var y = tempYStart + tempHeight - (norm * tempHeight);
+            for (var i = 0; i < forecastHours && i < 72; i++) {
+                var x = chartX + (i * chartWidth / forecastHours);
+                var norm = (temps[i] - minTemp) / tempRange;
+                if (norm < 0.0) { norm = 0.0; }
+                if (norm > 1.0) { norm = 1.0; }
+                var y = tempYStart + tempHeight - (norm * tempHeight);
 
-            if (prevX >= 0) {
-                dc.drawLine(prevX, prevTempY, x, y.toNumber());
+                if (prevX >= 0) {
+                    dc.drawLine(prevX, prevTempY, x, y.toNumber());
+                }
+                prevX = x;
+                prevTempY = y.toNumber();
             }
-            prevX = x;
-            prevTempY = y.toNumber();
+            dc.setPenWidth(1);
         }
-        dc.setPenWidth(1);
 
         // Wind line (subtle but visible)
-        dc.setColor(Theme.dimColor(Theme.WIND_SPEED, 0.5), Graphics.COLOR_TRANSPARENT);
-        prevX = -1;
-        var prevWindY = -1;
+        if (Settings.isShowWind()) {
+            var tempYStart = chartY + 10;
+            var tempHeight = chartHeight - 25;
 
-        for (var i = 0; i < 72; i++) {
-            var x = chartX + (i * chartWidth / 72);
-            var norm = winds[i] / 20.0;  // Lower ceiling for typical wind speeds 5-15 km/h
-            if (norm > 1.0) { norm = 1.0; }
-            var y = tempYStart + 2 + (tempHeight - 4) - (norm * (tempHeight - 4));
+            dc.setColor(Theme.dimColor(Theme.WIND_SPEED, 0.5), Graphics.COLOR_TRANSPARENT);
+            var prevX = -1;
+            var prevWindY = -1;
 
-            if (prevX >= 0) {
-                dc.drawLine(prevX, prevWindY, x, y.toNumber());
+            for (var i = 0; i < forecastHours && i < 72; i++) {
+                var x = chartX + (i * chartWidth / forecastHours);
+                var norm = winds[i] / 20.0;
+                if (norm > 1.0) { norm = 1.0; }
+                var y = tempYStart + 2 + (tempHeight - 4) - (norm * (tempHeight - 4));
+
+                if (prevX >= 0) {
+                    dc.drawLine(prevX, prevWindY, x, y.toNumber());
+                }
+                prevX = x;
+                prevWindY = y.toNumber();
             }
-            prevX = x;
-            prevWindY = y.toNumber();
         }
 
         // Precipitation bars - draw from bottom of chart, upward
-        var precipBaseY = chartY + chartHeight - 12;  // Above the day/night band
+        if (Settings.isShowPrecipitation()) {
+            var precipBaseY = chartY + chartHeight - 12;
 
-        for (var i = 0; i < 72; i++) {
-            var precipChance = precips[i];
-            if (precipChance > 5) {  // Lower threshold from 15% to 5%
-                var x = chartX + (i * chartWidth / 72);
-                // Scale height: 5% = 2px, 100% = 20px
-                // FIXED: Use float division to avoid integer truncation (18/95=0)
-                var h = (2 + (precipChance - 5).toFloat() * 18.0 / 95.0).toNumber();
-                if (h > 20) { h = 20; }
+            for (var i = 0; i < forecastHours && i < 72; i++) {
+                var precipChance = precips[i];
+                if (precipChance > 5) {
+                    var x = chartX + (i * chartWidth / forecastHours);
+                    var h = (2 + (precipChance - 5).toFloat() * 18.0 / 95.0).toNumber();
+                    if (h > 20) { h = 20; }
 
-                // Color intensity based on chance
-                var intensity = 0.4 + (precipChance / 100.0) * 0.6;
-                dc.setColor(Theme.dimColor(Theme.PRECIPITATION, intensity), Graphics.COLOR_TRANSPARENT);
-                dc.fillRectangle(x, precipBaseY - h, 3, h);  // 3px bars to fit 72 hours
+                    var intensity = 0.4 + (precipChance / 100.0) * 0.6;
+                    dc.setColor(Theme.dimColor(Theme.PRECIPITATION, intensity), Graphics.COLOR_TRANSPARENT);
+                    dc.fillRectangle(x, precipBaseY - h, 3, h);
+                }
             }
         }
 
         // Day separators (dotted lines at midnight)
-        var days = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];  // Two-letter abbreviations
-        var dayLabelY = chartY + chartHeight + 3;  // Below chart with spacing
+        var days = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+        var dayLabelY = chartY + chartHeight + 3;
 
-        for (var i = 6; i < 72; i += 6) {
+        for (var i = 6; i < forecastHours && i < 72; i += 6) {
             var hour = (currentHour + i) % 24;
-            var x = chartX + (i * chartWidth / 72);
+            var x = chartX + (i * chartWidth / forecastHours);
 
             if (hour == 0) {
-                // Dotted vertical line
                 dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
                 for (var dy = chartY + 4; dy < chartY + chartHeight - 8; dy += 3) {
                     dc.fillRectangle(x, dy, 1, 1);
@@ -278,95 +296,102 @@ class WatchFaceView extends WatchUi.WatchFace {
             }
         }
 
-        // Day labels BELOW the chart - using mini letters, brighter than before
-        // Position labels at center of each day's span
+        // Day labels BELOW the chart
+        // Show label when ANY part of day is visible, centered on visible portion
         var hoursUntilMidnight = (24 - currentHour) % 24;
         if (hoursUntilMidnight == 0) { hoursUntilMidnight = 24; }
 
-        var dayLabelColor = Theme.TEXT_DIM;  // Brighter than before (was dimColor 0.6)
+        var dayLabelColor = Theme.TEXT_DIM;
 
-        // Today's label - center of remaining hours
+        // Today's label (always visible, from hour 0 to hoursUntilMidnight)
         var todayCenter = hoursUntilMidnight / 2;
-        var todayX = chartX + (todayCenter * chartWidth / 72);
+        var todayX = chartX + (todayCenter * chartWidth / forecastHours);
         var todayIdx = (dayOfWeek - 1);
         if (todayIdx < 0) { todayIdx = 6; }
         drawMiniText(dc, todayX, dayLabelY, days[todayIdx], dayLabelColor);
 
         // Tomorrow's label (day +1)
         var day1Start = hoursUntilMidnight;
-        var day1Center = day1Start + 12;
-        if (day1Center < 72) {
-            var day1X = chartX + (day1Center * chartWidth / 72);
+        var day1End = day1Start + 24;
+        if (day1End > forecastHours) { day1End = forecastHours; }
+        if (day1Start < forecastHours) {
+            var day1Center = (day1Start + day1End) / 2;
+            var day1X = chartX + (day1Center * chartWidth / forecastHours);
             var day1Idx = (dayOfWeek) % 7;
             drawMiniText(dc, day1X, dayLabelY, days[day1Idx], dayLabelColor);
         }
 
         // Day +2 label
         var day2Start = hoursUntilMidnight + 24;
-        var day2Center = day2Start + 12;
-        if (day2Center < 72) {
-            var day2X = chartX + (day2Center * chartWidth / 72);
+        var day2End = day2Start + 24;
+        if (day2End > forecastHours) { day2End = forecastHours; }
+        if (day2Start < forecastHours) {
+            var day2Center = (day2Start + day2End) / 2;
+            var day2X = chartX + (day2Center * chartWidth / forecastHours);
             var day2Idx = (dayOfWeek + 1) % 7;
             drawMiniText(dc, day2X, dayLabelY, days[day2Idx], dayLabelColor);
         }
 
-        // Day +3 label (Thursday if today is Monday)
+        // Day +3 label
         var day3Start = hoursUntilMidnight + 48;
-        var day3Center = day3Start + 12;
-        if (day3Center < 72) {
-            var day3X = chartX + (day3Center * chartWidth / 72);
+        var day3End = day3Start + 24;
+        if (day3End > forecastHours) { day3End = forecastHours; }
+        if (day3Start < forecastHours) {
+            var day3Center = (day3Start + day3End) / 2;
+            var day3X = chartX + (day3Center * chartWidth / forecastHours);
             var day3Idx = (dayOfWeek + 2) % 7;
             drawMiniText(dc, day3X, dayLabelY, days[day3Idx], dayLabelColor);
         }
 
         // Temperature boxes (high/low for each visible day) - using mini-digits
-        var boxH = 10;
-        var boxW = 16;
-        var boxR = 2;  // Corner radius
+        if (Settings.isShowTemperature()) {
+            var tempYStart = chartY + 10;
+            var tempHeight = chartHeight - 25;
+            var boxH = 10;
+            var boxW = 16;
+            var boxR = 2;
 
-        for (var d = 0; d < 3; d++) {
-            if (dayHighs[d] > -100.0) {
-                // Draw high temp box
-                var hiIdx = dayHighIdx[d];
-                var hiX = chartX + (hiIdx * chartWidth / 72);
-                var hiNorm = (dayHighs[d] - minTemp) / tempRange;
-                if (hiNorm < 0.0) { hiNorm = 0.0; }
-                if (hiNorm > 1.0) { hiNorm = 1.0; }
-                var hiY = tempYStart + tempHeight - (hiNorm * tempHeight);
-                var hiBoxY = hiY.toNumber() - 11;
+            for (var d = 0; d < 3; d++) {
+                if (dayHighs[d] > -100.0) {
+                    var hiIdx = dayHighIdx[d];
+                    if (hiIdx < forecastHours) {
+                        var hiX = chartX + (hiIdx * chartWidth / forecastHours);
+                        var hiNorm = (dayHighs[d] - minTemp) / tempRange;
+                        if (hiNorm < 0.0) { hiNorm = 0.0; }
+                        if (hiNorm > 1.0) { hiNorm = 1.0; }
+                        var hiY = tempYStart + tempHeight - (hiNorm * tempHeight);
+                        var hiBoxY = hiY.toNumber() - 11;
 
-                // Background box
-                dc.setColor(Theme.dimColor(Theme.TEMP_CURVE, 0.25), Graphics.COLOR_TRANSPARENT);
-                dc.fillRoundedRectangle(hiX - boxW/2, hiBoxY, boxW, boxH, boxR);
+                        dc.setColor(Theme.dimColor(Theme.TEMP_CURVE, 0.25), Graphics.COLOR_TRANSPARENT);
+                        dc.fillRoundedRectangle(hiX - boxW/2, hiBoxY, boxW, boxH, boxR);
 
-                // Mini number
-                drawMiniNumber(dc, hiX, hiBoxY + 5, dayHighs[d].toNumber(), Theme.TEMP_CURVE);
-            }
+                        var displayHi = Settings.getDisplayTemp(dayHighs[d].toNumber());
+                        drawMiniNumber(dc, hiX, hiBoxY + 5, displayHi, Theme.TEMP_CURVE);
+                    }
+                }
 
-            if (dayLows[d] < 100.0 && d > 0) {  // Skip today's low if partial day
-                // Draw low temp box
-                var loIdx = dayLowIdx[d];
-                var loX = chartX + (loIdx * chartWidth / 72);
-                var loNorm = (dayLows[d] - minTemp) / tempRange;
-                if (loNorm < 0.0) { loNorm = 0.0; }
-                if (loNorm > 1.0) { loNorm = 1.0; }
-                var loY = tempYStart + tempHeight - (loNorm * tempHeight);
-                var loBoxY = loY.toNumber() + 3;
+                if (dayLows[d] < 100.0 && d > 0) {
+                    var loIdx = dayLowIdx[d];
+                    if (loIdx < forecastHours) {
+                        var loX = chartX + (loIdx * chartWidth / forecastHours);
+                        var loNorm = (dayLows[d] - minTemp) / tempRange;
+                        if (loNorm < 0.0) { loNorm = 0.0; }
+                        if (loNorm > 1.0) { loNorm = 1.0; }
+                        var loY = tempYStart + tempHeight - (loNorm * tempHeight);
+                        var loBoxY = loY.toNumber() + 3;
 
-                // Background box (dimmer)
-                dc.setColor(Theme.dimColor(Theme.TEMP_CURVE, 0.15), Graphics.COLOR_TRANSPARENT);
-                dc.fillRoundedRectangle(loX - boxW/2, loBoxY, boxW, boxH, boxR);
+                        dc.setColor(Theme.dimColor(Theme.TEMP_CURVE, 0.15), Graphics.COLOR_TRANSPARENT);
+                        dc.fillRoundedRectangle(loX - boxW/2, loBoxY, boxW, boxH, boxR);
 
-                // Mini number (dimmer)
-                drawMiniNumber(dc, loX, loBoxY + 5, dayLows[d].toNumber(), Theme.dimColor(Theme.TEMP_CURVE, 0.7));
+                        var displayLo = Settings.getDisplayTemp(dayLows[d].toNumber());
+                        drawMiniNumber(dc, loX, loBoxY + 5, displayLo, Theme.dimColor(Theme.TEMP_CURVE, 0.7));
+                    }
+                }
             }
         }
-
-        // NOW indicator removed - was too prominent
     }
 
     private function drawDate(dc) {
-        // Date row - moved down
         var y = 172;
         var center = Theme.getCenter();
         var now = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
@@ -374,38 +399,57 @@ class WatchFaceView extends WatchUi.WatchFace {
         var dayNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
         var monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
-        var dateStr = dayNames[now.day_of_week - 1] + " " + now.day + " " + monthNames[now.month - 1];
+        // Format date based on setting
+        var dateFormat = Settings.getDateFormat();
+        var dateStr;
+        if (dateFormat == 0) {
+            // Wed 15 Jan
+            dateStr = dayNames[now.day_of_week - 1] + " " + now.day + " " + monthNames[now.month - 1];
+        } else if (dateFormat == 1) {
+            // 15 Jan Wed
+            dateStr = now.day + " " + monthNames[now.month - 1] + " " + dayNames[now.day_of_week - 1];
+        } else {
+            // Jan 15
+            dateStr = monthNames[now.month - 1] + " " + now.day;
+        }
 
-        var startOfYear = Gregorian.moment({:year => now.year, :month => 1, :day => 1});
-        var dayOfYear = ((Time.now().value() - startOfYear.value()) / 86400).toNumber() + 1;
-        var startDow = Gregorian.info(startOfYear, Time.FORMAT_SHORT).day_of_week;
-        var weekNum = ((dayOfYear + startDow - 2) / 7).toNumber() + 1;
+        var showWeekNum = Settings.isShowWeekNumber();
+        var weekNum = 0;
+        if (showWeekNum) {
+            var startOfYear = Gregorian.moment({:year => now.year, :month => 1, :day => 1});
+            var dayOfYear = ((Time.now().value() - startOfYear.value()) / 86400).toNumber() + 1;
+            var startDow = Gregorian.info(startOfYear, Time.FORMAT_SHORT).day_of_week;
+            weekNum = ((dayOfYear + startDow - 2) / 7).toNumber() + 1;
+        }
 
-        var dateWidth = dc.getTextWidthInPixels(dateStr, Graphics.FONT_XTINY);
-        var badgeWidth = 24;  // Wider to cover number
-        var badgeGap = 6;
-        var totalWidth = dateWidth + badgeGap + badgeWidth;
-        var startX = center - (totalWidth / 2);
+        if (showWeekNum) {
+            var dateWidth = dc.getTextWidthInPixels(dateStr, Graphics.FONT_XTINY);
+            var badgeWidth = 24;
+            var badgeGap = 6;
+            var totalWidth = dateWidth + badgeGap + badgeWidth;
+            var startX = center - (totalWidth / 2);
 
-        dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(startX, y, Graphics.FONT_XTINY, dateStr, Graphics.TEXT_JUSTIFY_LEFT);
+            dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(startX, y, Graphics.FONT_XTINY, dateStr, Graphics.TEXT_JUSTIFY_LEFT);
 
-        var fontH = dc.getFontHeight(Graphics.FONT_XTINY);
-        var badgeH = fontH;  // Match font height exactly
-        var badgeX = startX + dateWidth + badgeGap;
-        var badgeY = y;  // Align with text baseline
+            var fontH = dc.getFontHeight(Graphics.FONT_XTINY);
+            var badgeH = fontH;
+            var badgeX = startX + dateWidth + badgeGap;
+            var badgeY = y;
 
-        dc.setColor(Theme.WEEK_BADGE, Graphics.COLOR_TRANSPARENT);
-        dc.fillRoundedRectangle(badgeX, badgeY, badgeWidth, badgeH, 4);
+            dc.setColor(Theme.WEEK_BADGE, Graphics.COLOR_TRANSPARENT);
+            dc.fillRoundedRectangle(badgeX, badgeY, badgeWidth, badgeH, 4);
 
-        dc.setColor(Theme.BG, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(badgeX + badgeWidth / 2, badgeY + badgeH / 2, Graphics.FONT_XTINY, weekNum.format("%d"), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.setColor(Theme.BG, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(badgeX + badgeWidth / 2, badgeY + badgeH / 2, Graphics.FONT_XTINY, weekNum.format("%d"), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        } else {
+            dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(center, y, Graphics.FONT_XTINY, dateStr, Graphics.TEXT_JUSTIFY_CENTER);
+        }
     }
 
     private function drawTime(dc) {
-        // Time display with step goal fill effect
         var clockTime = System.getClockTime();
-        var deviceSettings = System.getDeviceSettings();
         var center = Theme.getCenter();
         var baseY = 268;
 
@@ -413,7 +457,10 @@ class WatchFaceView extends WatchUi.WatchFace {
         var min = clockTime.min;
         var isPM = hour >= 12;
 
-        if (!deviceSettings.is24Hour) {
+        // Use settings for clock format
+        var is24h = Settings.is24Hour();
+
+        if (!is24h) {
             if (hour > 12) { hour = hour - 12; }
             if (hour == 0) { hour = 12; }
         }
@@ -422,7 +469,6 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         var stepProgress = 0.0;
         if (DEBUG_SIMULATOR) {
-            // Use debug values for simulator testing
             stepProgress = DEBUG_STEPS.toFloat() / DEBUG_STEP_GOAL.toFloat();
         } else {
             var actInfo = ActivityMonitor.getInfo();
@@ -437,8 +483,6 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         var textTop = baseY - (fontHeight / 2);
         var textBottom = baseY + (fontHeight / 2);
-        // Scale progress by 1.5x so visual fill matches perceived completion
-        // (digit pixels are mostly in upper 70% of font height, so 30% real = ~5% visible)
         var scaledProgress = stepProgress * 1.5;
         if (scaledProgress > 1.0) { scaledProgress = 1.0; }
         var fillPixels = (fontHeight * scaledProgress).toNumber();
@@ -458,33 +502,120 @@ class WatchFaceView extends WatchUi.WatchFace {
             dc.clearClip();
         }
 
-        // PM/AM and seconds - stacked vertically to the right of time with proper spacing
+        // Seconds and AM/PM - only show if enabled in settings
         var timeWidth = dc.getTextWidthInPixels(timeStr, timeFont);
         var rightX = center + (timeWidth / 2) + 8;
 
-        // Seconds on top (larger, brighter) - moved higher
-        dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(rightX, baseY - 24, Graphics.FONT_TINY, clockTime.sec.format("%02d"), Graphics.TEXT_JUSTIFY_LEFT);
+        if (Settings.isShowSeconds()) {
+            dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(rightX, baseY - 24, Graphics.FONT_TINY, clockTime.sec.format("%02d"), Graphics.TEXT_JUSTIFY_LEFT);
+        }
 
-        // AM/PM below seconds (smaller, dimmer) - moved lower
-        if (!deviceSettings.is24Hour) {
+        if (!is24h) {
             dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
             dc.drawText(rightX, baseY + 16, Graphics.FONT_XTINY, isPM ? "PM" : "AM", Graphics.TEXT_JUSTIFY_LEFT);
         }
     }
 
     private function drawStats(dc) {
-        // New layout: Rings on LEFT with HR in center, Secondary Timezone on RIGHT
         var center = Theme.getCenter();
+        var ringLayout = Settings.getRingLayout();
 
-        // === LEFT SIDE: Activity Rings with HR in center ===
+        // === LEFT SIDE: Activity Rings ===
+        if (ringLayout != 2) {  // Not "Off"
+            drawActivityRings(dc, center);
+        }
+
+        // === RIGHT SIDE: World Clocks ===
+        var worldClockCount = Settings.getWorldClockCount();
+        if (worldClockCount > 0) {
+            drawWorldClocks(dc, center, worldClockCount);
+        }
+    }
+
+    private function drawActivityRings(dc, center) {
         var ringsX = center - 70;
         var ringsY = 370;
         var stroke = 4;
-        var outerR = 34;   // Steps (outer)
-        var middleR = 26;  // Floors (middle)
-        var innerR = 18;   // Body Battery (inner)
+        var outerR = 34;
+        var middleR = 26;
+        var innerR = 18;
 
+        var ringLayout = Settings.getRingLayout();
+
+        // Get all activity data
+        var activityData = getActivityData();
+        var currentSteps = activityData[:steps];
+        var stepsProgress = activityData[:stepsProgress];
+        var currentFloors = activityData[:floors];
+        var floorsProgress = activityData[:floorsProgress];
+        var bodyBattery = activityData[:bodyBattery];
+        var bodyBatteryProgress = activityData[:bodyBatteryProgress];
+        var currentHR = activityData[:hr];
+        var hrProgress = activityData[:hrProgress];
+
+        // Get configured data sources
+        var outerType = Settings.getOuterRing();
+        var middleType = Settings.getMiddleRing();
+        var innerType = Settings.getInnerRing();
+
+        // Draw outer ring
+        if (outerType != 4) {
+            var outerData = getRingData(outerType, stepsProgress, floorsProgress, bodyBatteryProgress, hrProgress);
+            drawRing(dc, ringsX, ringsY, outerR, stroke, outerData[:progress], Theme.getRingColor(outerType));
+        }
+
+        // Draw middle ring (only if layout is "All 3")
+        if (ringLayout == 0 && middleType != 4) {
+            var middleData = getRingData(middleType, stepsProgress, floorsProgress, bodyBatteryProgress, hrProgress);
+            drawRing(dc, ringsX, ringsY, middleR, stroke, middleData[:progress], Theme.getRingColor(middleType));
+        }
+
+        // Draw inner ring (only if layout is "All 3")
+        if (ringLayout == 0 && innerType != 4) {
+            var innerData = getRingData(innerType, stepsProgress, floorsProgress, bodyBatteryProgress, hrProgress);
+            drawRing(dc, ringsX, ringsY, innerR, stroke, innerData[:progress], Theme.getRingColor(innerType));
+        }
+
+        // Icons to the right of rings
+        if (Settings.isShowRingIcons()) {
+            var iconX = ringsX + outerR + 10;
+            var iconSpacing = 18;
+
+            if (outerType != 4) {
+                drawRingIcon(dc, iconX, ringsY - iconSpacing - 5, outerType);
+            }
+            if (ringLayout == 0 && middleType != 4) {
+                drawRingIcon(dc, iconX, ringsY - 5, middleType);
+            }
+            if (ringLayout == 0 && innerType != 4) {
+                drawRingIcon(dc, iconX, ringsY + iconSpacing - 5, innerType);
+            }
+        }
+
+        // Center data
+        var centerType = Settings.getCenterData();
+        if (centerType != 2) {  // Not "Off"
+            if (centerType == 0) {
+                // Steps
+                drawMiniNumber(dc, ringsX, ringsY, currentSteps, Theme.STEPS_RING);
+            } else if (centerType == 1) {
+                // HR with heart icon
+                var hrDigits = currentHR >= 100 ? 3 : 2;
+                var hrTotalWidth = (hrDigits * 9) + 8;
+                var hrStartX = ringsX - (hrTotalWidth / 2);
+                drawHeartIcon(dc, hrStartX, ringsY - 2, Theme.HR_RING);
+                drawMiniNumber(dc, ringsX + 5, ringsY, currentHR, Theme.HR_RING);
+            }
+        }
+
+        // Steps count below rings (if center shows HR or is off)
+        if (centerType != 0) {
+            drawMiniNumber(dc, ringsX, ringsY + outerR + 14, currentSteps, Theme.STEPS_RING);
+        }
+    }
+
+    private function getActivityData() {
         var currentSteps = 0;
         var stepsProgress = 0.0;
         var currentFloors = 0;
@@ -492,9 +623,9 @@ class WatchFaceView extends WatchUi.WatchFace {
         var bodyBattery = 0;
         var bodyBatteryProgress = 0.0;
         var currentHR = 0;
+        var hrProgress = 0.0;
 
         if (DEBUG_SIMULATOR) {
-            // Use debug values for simulator testing
             currentSteps = DEBUG_STEPS;
             stepsProgress = DEBUG_STEPS.toFloat() / DEBUG_STEP_GOAL.toFloat();
             if (stepsProgress > 1.0) { stepsProgress = 1.0; }
@@ -507,13 +638,15 @@ class WatchFaceView extends WatchUi.WatchFace {
             bodyBatteryProgress = bodyBattery / 100.0;
 
             currentHR = DEBUG_HR;
+            hrProgress = (currentHR - 40).toFloat() / 160.0;  // 40-200 range
+            if (hrProgress > 1.0) { hrProgress = 1.0; }
+            if (hrProgress < 0.0) { hrProgress = 0.0; }
         } else {
-            // Get Heart Rate from Activity (live during workout) or ActivityMonitor (resting)
+            // Get Heart Rate
             var activityInfo = Activity.getActivityInfo();
             if (activityInfo != null && activityInfo.currentHeartRate != null) {
                 currentHR = activityInfo.currentHeartRate;
             } else {
-                // Try to get latest HR from history
                 var hrIterator = ActivityMonitor.getHeartRateHistory(1, true);
                 if (hrIterator != null) {
                     var hrSample = hrIterator.next();
@@ -522,8 +655,11 @@ class WatchFaceView extends WatchUi.WatchFace {
                     }
                 }
             }
+            hrProgress = (currentHR - 40).toFloat() / 160.0;
+            if (hrProgress > 1.0) { hrProgress = 1.0; }
+            if (hrProgress < 0.0) { hrProgress = 0.0; }
 
-            // Get Body Battery from SensorHistory
+            // Get Body Battery
             if (Toybox has :SensorHistory && SensorHistory has :getBodyBatteryHistory) {
                 var bbIterator = SensorHistory.getBodyBatteryHistory({:period => 1, :order => SensorHistory.ORDER_NEWEST_FIRST});
                 if (bbIterator != null) {
@@ -537,7 +673,6 @@ class WatchFaceView extends WatchUi.WatchFace {
 
             var actInfo = ActivityMonitor.getInfo();
             if (actInfo != null) {
-                // Steps
                 if (actInfo.steps != null) {
                     currentSteps = actInfo.steps;
                 }
@@ -546,11 +681,10 @@ class WatchFaceView extends WatchUi.WatchFace {
                     if (stepsProgress > 1.0) { stepsProgress = 1.0; }
                 }
 
-                // Floors - default goal to 10 if not set
                 if (actInfo.floorsClimbed != null) {
                     currentFloors = actInfo.floorsClimbed;
                 }
-                var floorGoal = 10;  // Default goal
+                var floorGoal = 10;
                 if (actInfo.floorsClimbedGoal != null && actInfo.floorsClimbedGoal > 0) {
                     floorGoal = actInfo.floorsClimbedGoal;
                 }
@@ -559,141 +693,147 @@ class WatchFaceView extends WatchUi.WatchFace {
             }
         }
 
-        // Draw rings: Steps (outer), Floors (middle), Body Battery (inner)
-        drawRing(dc, ringsX, ringsY, outerR, stroke, stepsProgress, Theme.STEPS_RING);
-        drawRing(dc, ringsX, ringsY, middleR, stroke, floorsProgress, Theme.FLOORS_RING);
-        drawRing(dc, ringsX, ringsY, innerR, stroke, bodyBatteryProgress, Theme.BODY_BATTERY_RING);
+        return {
+            :steps => currentSteps,
+            :stepsProgress => stepsProgress,
+            :floors => currentFloors,
+            :floorsProgress => floorsProgress,
+            :bodyBattery => bodyBattery,
+            :bodyBatteryProgress => bodyBatteryProgress,
+            :hr => currentHR,
+            :hrProgress => hrProgress
+        };
+    }
 
-        // Icons to the right of rings (vertically stacked, matching ring order)
-        var iconX = ringsX + outerR + 10;  // Right of outer ring with gap
-        var iconSpacing = 18;              // Vertical spacing between icons
-        drawStepsIcon(dc, iconX, ringsY - iconSpacing - 5, Theme.STEPS_RING);
-        drawStairsIcon(dc, iconX, ringsY - 5, Theme.FLOORS_RING);
-        drawBodyBatteryIcon(dc, iconX, ringsY + iconSpacing - 5, Theme.BODY_BATTERY_RING);
+    private function getRingData(dataType, stepsProgress, floorsProgress, bodyBatteryProgress, hrProgress) {
+        switch (dataType) {
+            case 0: return { :progress => stepsProgress };
+            case 1: return { :progress => floorsProgress };
+            case 2: return { :progress => bodyBatteryProgress };
+            case 3: return { :progress => hrProgress };
+            default: return { :progress => 0.0 };
+        }
+    }
 
-        // HR in center of rings - heart icon close to number
-        // Adjust position based on digit count to avoid touching inner ring
-        var hrDigits = currentHR >= 100 ? 3 : 2;
-        var hrTotalWidth = (hrDigits * 9) + 8;  // digits + heart + gap
-        var hrStartX = ringsX - (hrTotalWidth / 2);
-        drawHeartIcon(dc, hrStartX, ringsY - 2, Theme.HR_RING);
-        drawMiniNumber(dc, ringsX + 5, ringsY, currentHR, Theme.HR_RING);
+    private function drawRingIcon(dc, x, y, dataType) {
+        var color = Theme.getRingColor(dataType);
+        switch (dataType) {
+            case 0: drawStepsIcon(dc, x, y, color); break;
+            case 1: drawStairsIcon(dc, x, y, color); break;
+            case 2: drawBodyBatteryIcon(dc, x, y, color); break;
+            case 3: drawHeartIcon(dc, x, y, color); break;
+        }
+    }
 
-        // Steps count below rings - using mini-digits
-        drawMiniNumber(dc, ringsX, ringsY + outerR + 14, currentSteps, Theme.STEPS_RING);
-
-        // === RIGHT SIDE: Secondary Timezones (São Paulo + San Francisco) ===
-        // Stacked vertically with clear separation
+    private function drawWorldClocks(dc, center, count) {
+        var ringsY = 370;
         var tzX = center + 80;
         var clockTime = System.getClockTime();
-        var localOffset = clockTime.timeZoneOffset / 3600;  // Local offset in hours
+        var localOffset = clockTime.timeZoneOffset / 3600;
 
-        // São Paulo time (BRT = UTC-3)
-        var spOffset = -3;
-        var spHour = (clockTime.hour - localOffset + spOffset + 48) % 24;
-        var spMin = clockTime.min;
+        var labelX = tzX - 80;
+        var timeX = tzX - 15;
 
-        // San Francisco time (PST/PDT = UTC-8/-7, using -8 for simplicity)
-        var sfOffset = -8;
-        var sfHour = (clockTime.hour - localOffset + sfOffset + 48) % 24;
-        var sfMin = clockTime.min;
+        if (count >= 1) {
+            var tz1Name = Settings.getTimezone1Name();
+            var tz1Offset = Settings.getTimezone1Offset();
+            var tz1Hour = (clockTime.hour - localOffset + tz1Offset + 48) % 24;
+            var tz1Min = clockTime.min;
 
-        // Vertical layout: SAO on top, SFO below
-        // Each timezone: label on left, time on right (same line)
-        var tzY1 = ringsY - 30;  // SAO row (higher)
-        var tzY2 = ringsY + 10;  // SFO row (moved up to avoid bottom cutoff)
+            var tzY1 = count >= 2 ? ringsY - 30 : ringsY - 10;
 
-        // Positions: move everything left, more gap between label and time
-        var labelX = tzX - 80;  // Labels much further left
-        var timeX = tzX - 15;   // Times moved left too (avoid edge cutoff)
+            dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(labelX, tzY1, Graphics.FONT_XTINY, tz1Name, Graphics.TEXT_JUSTIFY_LEFT);
+            dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(timeX, tzY1, Graphics.FONT_XTINY, tz1Hour.format("%02d") + ":" + tz1Min.format("%02d"), Graphics.TEXT_JUSTIFY_LEFT);
+        }
 
-        // São Paulo: "SAO 07:02"
-        dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(labelX, tzY1, Graphics.FONT_XTINY, "SAO", Graphics.TEXT_JUSTIFY_LEFT);
-        dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(timeX, tzY1, Graphics.FONT_XTINY, spHour.format("%02d") + ":" + spMin.format("%02d"), Graphics.TEXT_JUSTIFY_LEFT);
+        if (count >= 2) {
+            var tz2Name = Settings.getTimezone2Name();
+            var tz2Offset = Settings.getTimezone2Offset();
+            var tz2Hour = (clockTime.hour - localOffset + tz2Offset + 48) % 24;
+            var tz2Min = clockTime.min;
 
-        // San Francisco: "SFO 05:02"
-        dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(labelX, tzY2, Graphics.FONT_XTINY, "SFO", Graphics.TEXT_JUSTIFY_LEFT);
-        dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(timeX, tzY2, Graphics.FONT_XTINY, sfHour.format("%02d") + ":" + sfMin.format("%02d"), Graphics.TEXT_JUSTIFY_LEFT);
+            var tzY2 = ringsY + 10;
+
+            dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(labelX, tzY2, Graphics.FONT_XTINY, tz2Name, Graphics.TEXT_JUSTIFY_LEFT);
+            dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(timeX, tzY2, Graphics.FONT_XTINY, tz2Hour.format("%02d") + ":" + tz2Min.format("%02d"), Graphics.TEXT_JUSTIFY_LEFT);
+        }
     }
 
     // Mini-digit renderer: draws 8x10 pixel digits
     private function drawMiniDigit(dc, x, y, digit, color) {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        // Each digit is 8px wide, 10px tall
         if (digit == 0) {
-            dc.fillRectangle(x+1, y, 6, 1);    // top
-            dc.fillRectangle(x+1, y+9, 6, 1);  // bottom
-            dc.fillRectangle(x, y+1, 1, 8);    // left
-            dc.fillRectangle(x+7, y+1, 1, 8);  // right
+            dc.fillRectangle(x+1, y, 6, 1);
+            dc.fillRectangle(x+1, y+9, 6, 1);
+            dc.fillRectangle(x, y+1, 1, 8);
+            dc.fillRectangle(x+7, y+1, 1, 8);
         } else if (digit == 1) {
-            dc.fillRectangle(x+4, y, 1, 10);   // center vertical
-            dc.fillRectangle(x+3, y+1, 1, 1);  // top left tick
+            dc.fillRectangle(x+4, y, 1, 10);
+            dc.fillRectangle(x+3, y+1, 1, 1);
         } else if (digit == 2) {
-            dc.fillRectangle(x, y, 8, 1);      // top
-            dc.fillRectangle(x+7, y+1, 1, 3);  // right upper
-            dc.fillRectangle(x+1, y+4, 6, 1);  // middle
-            dc.fillRectangle(x, y+5, 1, 4);    // left lower
-            dc.fillRectangle(x, y+9, 8, 1);    // bottom
+            dc.fillRectangle(x, y, 8, 1);
+            dc.fillRectangle(x+7, y+1, 1, 3);
+            dc.fillRectangle(x+1, y+4, 6, 1);
+            dc.fillRectangle(x, y+5, 1, 4);
+            dc.fillRectangle(x, y+9, 8, 1);
         } else if (digit == 3) {
-            dc.fillRectangle(x, y, 8, 1);      // top
-            dc.fillRectangle(x+7, y+1, 1, 8);  // right
-            dc.fillRectangle(x+1, y+4, 6, 1);  // middle
-            dc.fillRectangle(x, y+9, 8, 1);    // bottom
+            dc.fillRectangle(x, y, 8, 1);
+            dc.fillRectangle(x+7, y+1, 1, 8);
+            dc.fillRectangle(x+1, y+4, 6, 1);
+            dc.fillRectangle(x, y+9, 8, 1);
         } else if (digit == 4) {
-            dc.fillRectangle(x, y, 1, 5);      // left upper
-            dc.fillRectangle(x, y+4, 8, 1);    // middle
-            dc.fillRectangle(x+7, y, 1, 10);   // right
+            dc.fillRectangle(x, y, 1, 5);
+            dc.fillRectangle(x, y+4, 8, 1);
+            dc.fillRectangle(x+7, y, 1, 10);
         } else if (digit == 5) {
-            dc.fillRectangle(x, y, 8, 1);      // top
-            dc.fillRectangle(x, y+1, 1, 3);    // left upper
-            dc.fillRectangle(x, y+4, 8, 1);    // middle
-            dc.fillRectangle(x+7, y+5, 1, 4);  // right lower
-            dc.fillRectangle(x, y+9, 8, 1);    // bottom
+            dc.fillRectangle(x, y, 8, 1);
+            dc.fillRectangle(x, y+1, 1, 3);
+            dc.fillRectangle(x, y+4, 8, 1);
+            dc.fillRectangle(x+7, y+5, 1, 4);
+            dc.fillRectangle(x, y+9, 8, 1);
         } else if (digit == 6) {
-            dc.fillRectangle(x+1, y, 7, 1);    // top
-            dc.fillRectangle(x, y+1, 1, 8);    // left
-            dc.fillRectangle(x+1, y+4, 7, 1);  // middle
-            dc.fillRectangle(x+7, y+5, 1, 4);  // right lower
-            dc.fillRectangle(x+1, y+9, 6, 1);  // bottom
+            dc.fillRectangle(x+1, y, 7, 1);
+            dc.fillRectangle(x, y+1, 1, 8);
+            dc.fillRectangle(x+1, y+4, 7, 1);
+            dc.fillRectangle(x+7, y+5, 1, 4);
+            dc.fillRectangle(x+1, y+9, 6, 1);
         } else if (digit == 7) {
-            dc.fillRectangle(x, y, 8, 1);      // top
-            dc.fillRectangle(x+7, y+1, 1, 9);  // right
+            dc.fillRectangle(x, y, 8, 1);
+            dc.fillRectangle(x+7, y+1, 1, 9);
         } else if (digit == 8) {
-            dc.fillRectangle(x+1, y, 6, 1);    // top
-            dc.fillRectangle(x+1, y+4, 6, 1);  // middle
-            dc.fillRectangle(x+1, y+9, 6, 1);  // bottom
-            dc.fillRectangle(x, y+1, 1, 8);    // left
-            dc.fillRectangle(x+7, y+1, 1, 8);  // right
+            dc.fillRectangle(x+1, y, 6, 1);
+            dc.fillRectangle(x+1, y+4, 6, 1);
+            dc.fillRectangle(x+1, y+9, 6, 1);
+            dc.fillRectangle(x, y+1, 1, 8);
+            dc.fillRectangle(x+7, y+1, 1, 8);
         } else if (digit == 9) {
-            dc.fillRectangle(x+1, y, 6, 1);    // top
-            dc.fillRectangle(x, y+1, 1, 3);    // left upper
-            dc.fillRectangle(x+1, y+4, 7, 1);  // middle
-            dc.fillRectangle(x+7, y+1, 1, 8);  // right
-            dc.fillRectangle(x, y+9, 7, 1);    // bottom
+            dc.fillRectangle(x+1, y, 6, 1);
+            dc.fillRectangle(x, y+1, 1, 3);
+            dc.fillRectangle(x+1, y+4, 7, 1);
+            dc.fillRectangle(x+7, y+1, 1, 8);
+            dc.fillRectangle(x, y+9, 7, 1);
         }
     }
 
-    // Draw a mini number (multiple digits) centered at x,y - supports negative
     private function drawMiniNumber(dc, centerX, centerY, number, color) {
         var isNegative = number < 0;
         if (isNegative) { number = -number; }
 
         var str = number.format("%d");
         var len = str.length();
-        var digitWidth = 9;  // 8px digit + 1px gap
-        var minusWidth = isNegative ? 7 : 0;  // 6px minus + 1px gap
+        var digitWidth = 9;
+        var minusWidth = isNegative ? 7 : 0;
         var totalWidth = minusWidth + len * digitWidth - 1;
         var startX = centerX - totalWidth / 2;
-        var startY = centerY - 5;  // Center vertically (10px tall / 2)
+        var startY = centerY - 5;
 
-        // Draw minus sign if negative
         if (isNegative) {
             dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle(startX, startY + 4, 6, 1);  // Horizontal minus
+            dc.fillRectangle(startX, startY + 4, 6, 1);
             startX = startX + minusWidth;
         }
 
@@ -704,77 +844,74 @@ class WatchFaceView extends WatchUi.WatchFace {
         }
     }
 
-    // Draw mini letter for day labels (9x11 pixels - 1 point bigger than before)
     private function drawMiniLetter(dc, x, y, letter, color) {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        // 9x11 pixel letters
         if (letter.equals("M")) {
-            dc.fillRectangle(x, y, 1, 11);     // left
-            dc.fillRectangle(x+8, y, 1, 11);   // right
-            dc.fillRectangle(x+1, y+1, 1, 2);  // left inner
-            dc.fillRectangle(x+7, y+1, 1, 2);  // right inner
-            dc.fillRectangle(x+2, y+2, 2, 1);  // left diagonal
-            dc.fillRectangle(x+5, y+2, 2, 1);  // right diagonal
-            dc.fillRectangle(x+3, y+3, 3, 1);  // center
+            dc.fillRectangle(x, y, 1, 11);
+            dc.fillRectangle(x+8, y, 1, 11);
+            dc.fillRectangle(x+1, y+1, 1, 2);
+            dc.fillRectangle(x+7, y+1, 1, 2);
+            dc.fillRectangle(x+2, y+2, 2, 1);
+            dc.fillRectangle(x+5, y+2, 2, 1);
+            dc.fillRectangle(x+3, y+3, 3, 1);
         } else if (letter.equals("T")) {
-            dc.fillRectangle(x, y, 9, 1);      // top
-            dc.fillRectangle(x+4, y+1, 1, 10); // center (1px wide like other letters)
+            dc.fillRectangle(x, y, 9, 1);
+            dc.fillRectangle(x+4, y+1, 1, 10);
         } else if (letter.equals("W")) {
-            dc.fillRectangle(x, y, 1, 11);     // left
-            dc.fillRectangle(x+8, y, 1, 11);   // right
-            dc.fillRectangle(x+4, y+5, 1, 5);  // center
-            dc.fillRectangle(x+1, y+9, 3, 1);  // left inner
-            dc.fillRectangle(x+5, y+9, 3, 1);  // right inner
+            dc.fillRectangle(x, y, 1, 11);
+            dc.fillRectangle(x+8, y, 1, 11);
+            dc.fillRectangle(x+4, y+5, 1, 5);
+            dc.fillRectangle(x+1, y+9, 3, 1);
+            dc.fillRectangle(x+5, y+9, 3, 1);
         } else if (letter.equals("F")) {
-            dc.fillRectangle(x, y, 9, 1);      // top
-            dc.fillRectangle(x, y+1, 1, 10);   // left
-            dc.fillRectangle(x+1, y+5, 5, 1);  // middle
+            dc.fillRectangle(x, y, 9, 1);
+            dc.fillRectangle(x, y+1, 1, 10);
+            dc.fillRectangle(x+1, y+5, 5, 1);
         } else if (letter.equals("S")) {
-            dc.fillRectangle(x+1, y, 7, 1);    // top
-            dc.fillRectangle(x, y+1, 1, 4);    // left upper
-            dc.fillRectangle(x+1, y+5, 7, 1);  // middle
-            dc.fillRectangle(x+8, y+6, 1, 4);  // right lower
-            dc.fillRectangle(x+1, y+10, 7, 1); // bottom
+            dc.fillRectangle(x+1, y, 7, 1);
+            dc.fillRectangle(x, y+1, 1, 4);
+            dc.fillRectangle(x+1, y+5, 7, 1);
+            dc.fillRectangle(x+8, y+6, 1, 4);
+            dc.fillRectangle(x+1, y+10, 7, 1);
         } else if (letter.equals("U")) {
-            dc.fillRectangle(x, y, 1, 10);     // left
-            dc.fillRectangle(x+8, y, 1, 10);   // right
-            dc.fillRectangle(x+1, y+10, 7, 1); // bottom
+            dc.fillRectangle(x, y, 1, 10);
+            dc.fillRectangle(x+8, y, 1, 10);
+            dc.fillRectangle(x+1, y+10, 7, 1);
         } else if (letter.equals("O")) {
-            dc.fillRectangle(x+1, y, 7, 1);    // top
-            dc.fillRectangle(x, y+1, 1, 9);    // left
-            dc.fillRectangle(x+8, y+1, 1, 9);  // right
-            dc.fillRectangle(x+1, y+10, 7, 1); // bottom
+            dc.fillRectangle(x+1, y, 7, 1);
+            dc.fillRectangle(x, y+1, 1, 9);
+            dc.fillRectangle(x+8, y+1, 1, 9);
+            dc.fillRectangle(x+1, y+10, 7, 1);
         } else if (letter.equals("H")) {
-            dc.fillRectangle(x, y, 1, 11);     // left
-            dc.fillRectangle(x+8, y, 1, 11);   // right
-            dc.fillRectangle(x+1, y+5, 7, 1);  // middle
+            dc.fillRectangle(x, y, 1, 11);
+            dc.fillRectangle(x+8, y, 1, 11);
+            dc.fillRectangle(x+1, y+5, 7, 1);
         } else if (letter.equals("R")) {
-            dc.fillRectangle(x, y, 1, 11);     // left
-            dc.fillRectangle(x+1, y, 7, 1);    // top
-            dc.fillRectangle(x+8, y+1, 1, 4);  // right upper
-            dc.fillRectangle(x+1, y+5, 7, 1);  // middle
-            dc.fillRectangle(x+5, y+6, 1, 2);  // diagonal upper
-            dc.fillRectangle(x+6, y+8, 1, 1);  // diagonal mid
-            dc.fillRectangle(x+7, y+9, 2, 2);  // diagonal lower
+            dc.fillRectangle(x, y, 1, 11);
+            dc.fillRectangle(x+1, y, 7, 1);
+            dc.fillRectangle(x+8, y+1, 1, 4);
+            dc.fillRectangle(x+1, y+5, 7, 1);
+            dc.fillRectangle(x+5, y+6, 1, 2);
+            dc.fillRectangle(x+6, y+8, 1, 1);
+            dc.fillRectangle(x+7, y+9, 2, 2);
         } else if (letter.equals("A")) {
-            dc.fillRectangle(x+3, y, 3, 1);    // top
-            dc.fillRectangle(x+1, y+1, 2, 1);  // left upper
-            dc.fillRectangle(x+6, y+1, 2, 1);  // right upper
-            dc.fillRectangle(x, y+2, 1, 9);    // left
-            dc.fillRectangle(x+8, y+2, 1, 9);  // right
-            dc.fillRectangle(x+1, y+5, 7, 1);  // middle
+            dc.fillRectangle(x+3, y, 3, 1);
+            dc.fillRectangle(x+1, y+1, 2, 1);
+            dc.fillRectangle(x+6, y+1, 2, 1);
+            dc.fillRectangle(x, y+2, 1, 9);
+            dc.fillRectangle(x+8, y+2, 1, 9);
+            dc.fillRectangle(x+1, y+5, 7, 1);
         } else if (letter.equals("E")) {
-            dc.fillRectangle(x, y, 9, 1);      // top
-            dc.fillRectangle(x, y+1, 1, 9);    // left
-            dc.fillRectangle(x+1, y+5, 5, 1);  // middle
-            dc.fillRectangle(x, y+10, 9, 1);   // bottom
+            dc.fillRectangle(x, y, 9, 1);
+            dc.fillRectangle(x, y+1, 1, 9);
+            dc.fillRectangle(x+1, y+5, 5, 1);
+            dc.fillRectangle(x, y+10, 9, 1);
         }
     }
 
-    // Draw mini text (multiple letters) centered at x,y
     private function drawMiniText(dc, centerX, y, text, color) {
         var len = text.length();
-        var letterWidth = 10;  // 9px letter + 1px gap
+        var letterWidth = 10;
         var totalWidth = len * letterWidth - 1;
         var startX = centerX - totalWidth / 2;
 
@@ -784,66 +921,51 @@ class WatchFaceView extends WatchUi.WatchFace {
         }
     }
 
-    // Draw footprint icon for steps (9x10 pixels)
     private function drawStepsIcon(dc, x, y, color) {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        // Left foot
-        dc.fillRectangle(x, y+2, 2, 5);      // sole
-        dc.fillRectangle(x+2, y+3, 1, 3);    // arch
-        dc.fillRectangle(x, y, 2, 1);        // toe
-        // Right foot (offset down and right)
-        dc.fillRectangle(x+5, y+5, 2, 5);    // sole
-        dc.fillRectangle(x+4, y+6, 1, 3);    // arch
-        dc.fillRectangle(x+5, y+3, 2, 1);    // toe
+        dc.fillRectangle(x, y+2, 2, 5);
+        dc.fillRectangle(x+2, y+3, 1, 3);
+        dc.fillRectangle(x, y, 2, 1);
+        dc.fillRectangle(x+5, y+5, 2, 5);
+        dc.fillRectangle(x+4, y+6, 1, 3);
+        dc.fillRectangle(x+5, y+3, 2, 1);
     }
 
-    // Draw stairs icon (9x10 pixels)
     private function drawStairsIcon(dc, x, y, color) {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        // Three steps going up-right
-        dc.fillRectangle(x, y+8, 3, 2);      // bottom step
-        dc.fillRectangle(x+3, y+5, 3, 2);    // middle step
-        dc.fillRectangle(x+6, y+2, 3, 2);    // top step
-        // Risers (vertical parts)
-        dc.fillRectangle(x+3, y+7, 1, 3);    // bottom riser
-        dc.fillRectangle(x+6, y+4, 1, 3);    // middle riser
+        dc.fillRectangle(x, y+8, 3, 2);
+        dc.fillRectangle(x+3, y+5, 3, 2);
+        dc.fillRectangle(x+6, y+2, 3, 2);
+        dc.fillRectangle(x+3, y+7, 1, 3);
+        dc.fillRectangle(x+6, y+4, 1, 3);
     }
 
-    // Draw battery icon for body battery (9x10 pixels)
     private function drawBodyBatteryIcon(dc, x, y, color) {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        // Battery outline
-        dc.fillRectangle(x, y+1, 8, 1);      // top
-        dc.fillRectangle(x, y+9, 8, 1);      // bottom
-        dc.fillRectangle(x, y+2, 1, 7);      // left
-        dc.fillRectangle(x+7, y+2, 1, 7);    // right
-        // Positive terminal (bump on top)
+        dc.fillRectangle(x, y+1, 8, 1);
+        dc.fillRectangle(x, y+9, 8, 1);
+        dc.fillRectangle(x, y+2, 1, 7);
+        dc.fillRectangle(x+7, y+2, 1, 7);
         dc.fillRectangle(x+3, y, 3, 1);
-        // Fill inside (shows it's charged)
         dc.fillRectangle(x+2, y+3, 4, 5);
     }
 
-    // Draw heart icon for HR (6x5 pixels - compact)
     private function drawHeartIcon(dc, x, y, color) {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        // Two bumps at top
-        dc.fillRectangle(x, y, 2, 2);        // left bump
-        dc.fillRectangle(x+4, y, 2, 2);      // right bump
-        dc.fillRectangle(x+2, y+1, 2, 1);    // bridge
-        // Body and point
-        dc.fillRectangle(x, y+2, 6, 1);      // widest part
-        dc.fillRectangle(x+1, y+3, 4, 1);    // narrowing
-        dc.fillRectangle(x+2, y+4, 2, 1);    // point
+        dc.fillRectangle(x, y, 2, 2);
+        dc.fillRectangle(x+4, y, 2, 2);
+        dc.fillRectangle(x+2, y+1, 2, 1);
+        dc.fillRectangle(x, y+2, 6, 1);
+        dc.fillRectangle(x+1, y+3, 4, 1);
+        dc.fillRectangle(x+2, y+4, 2, 1);
     }
 
     private function drawRing(dc, x, y, radius, stroke, progress, color) {
         dc.setPenWidth(stroke);
 
-        // Background ring - brightened from 0.25 to 0.35
         dc.setColor(Theme.dimColor(color, 0.35), Graphics.COLOR_TRANSPARENT);
         dc.drawArc(x, y, radius, Graphics.ARC_CLOCKWISE, 90, -270);
 
-        // Progress arc
         if (progress > 0.01) {
             var sweepDeg = (progress * 360).toNumber();
             if (sweepDeg > 360) { sweepDeg = 360; }
@@ -860,18 +982,17 @@ class WatchFaceView extends WatchUi.WatchFace {
         var hour = clockTime.hour;
         var min = clockTime.min;
 
-        if (!System.getDeviceSettings().is24Hour) {
+        var is24h = Settings.is24Hour();
+        if (!is24h) {
             if (hour > 12) { hour = hour - 12; }
             if (hour == 0) { hour = 12; }
         }
 
-        // Time (center)
         dc.setColor(Theme.AOD_TIME, Graphics.COLOR_TRANSPARENT);
         dc.drawText(center, Theme.screenHeight / 2, Graphics.FONT_NUMBER_MILD,
             hour.format("%d") + ":" + min.format("%02d"),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // Date (below time)
         var now = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
         var dayNames = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
         dc.setColor(Theme.AOD_TEXT, Graphics.COLOR_TRANSPARENT);
@@ -879,10 +1000,11 @@ class WatchFaceView extends WatchUi.WatchFace {
             dayNames[now.day_of_week - 1] + " " + now.day,
             Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Battery (top right, minimal)
-        var battery = System.getSystemStats().battery.toNumber();
-        dc.drawText(Theme.screenWidth - 20, 15, Graphics.FONT_XTINY,
-            battery.format("%d") + "%",
-            Graphics.TEXT_JUSTIFY_RIGHT);
+        if (Settings.shouldShowBattery(System.getSystemStats().battery.toNumber())) {
+            var battery = System.getSystemStats().battery.toNumber();
+            dc.drawText(Theme.screenWidth - 20, 15, Graphics.FONT_XTINY,
+                battery.format("%d") + "%",
+                Graphics.TEXT_JUSTIFY_RIGHT);
+        }
     }
 }

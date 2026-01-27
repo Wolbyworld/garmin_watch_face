@@ -31,6 +31,7 @@ class WatchFaceApp extends Application.AppBase {
     }
 
     function onSettingsChanged() {
+        Settings.invalidateCache();
         WatchUi.requestUpdate();
     }
 }

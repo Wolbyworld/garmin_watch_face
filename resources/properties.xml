@@ -1,5 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <properties>
-    <property id="secondTimezoneName" type="string">NYC</property>
-    <property id="secondTimezoneOffset" type="number">-5</property>
+    <!-- Time & Date -->
+    <property id="clockFormat" type="number">2</property>
+    <property id="showSeconds" type="boolean">true</property>
+    <property id="dateFormat" type="number">0</property>
+    <property id="showWeekNumber" type="boolean">true</property>
+
+    <!-- World Clocks -->
+    <property id="worldClockCount" type="number">2</property>
+    <property id="timezone1" type="number">4</property>
+    <property id="timezone2" type="number">1</property>
+
+    <!-- Weather Chart -->
+    <property id="showWeatherChart" type="boolean">true</property>
+    <property id="showTemperature" type="boolean">true</property>
+    <property id="showPrecipitation" type="boolean">true</property>
+    <property id="showClouds" type="boolean">true</property>
+    <property id="showWind" type="boolean">true</property>
+    <property id="temperatureUnit" type="number">0</property>
+    <property id="forecastHours" type="number">1</property>
+
+    <!-- Activity Rings -->
+    <property id="ringLayout" type="number">0</property>
+    <property id="outerRing" type="number">0</property>
+    <property id="middleRing" type="number">1</property>
+    <property id="innerRing" type="number">2</property>
+    <property id="centerData" type="number">3</property>
+    <property id="showRingIcons" type="boolean">true</property>
+
+    <!-- Appearance -->
+    <property id="theme" type="number">0</property>
+    <property id="accentColor" type="number">0</property>
+    <property id="timeColor" type="number">0</property>
+    <property id="showBattery" type="number">0</property>
 </properties>

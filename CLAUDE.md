@@ -70,8 +70,8 @@ The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face t
 - **WatchFaceDelegate.mc**: Handles power mode transitions (sleep/wake for AOD)
 - **WeatherService.mc**: Background service that fetches from Open-Meteo API every 30 min
 - **WeatherDataManager.mc**: Module that caches weather data, tries external first then Garmin API
-- **Theme.mc**: Module holding all color constants and spacing values
-- Settings via CIQ properties for: units (C/F, km/mi), 12/24h, data field selection, theme selection
+- **Theme.mc**: Module holding colors, layout constants, and theme presets (Dark, Warm, Cool, HighContrast)
+- **Settings.mc**: Central settings cache with typed getters for all 22 configurable options
 
 ## Key CIQ APIs to Use
 - `WatchUi.WatchFace` / `WatchUi.WatchFaceDelegate`
@@ -265,12 +265,13 @@ garmin_watch_face/
 │   ├── WatchFaceDelegate.mc # Sleep/wake handling
 │   ├── WeatherDataManager.mc # Weather data cache + Garmin API fallback
 │   ├── WeatherService.mc    # Background service for Open-Meteo API
-│   └── Theme.mc             # Colors and layout constants
+│   ├── Theme.mc             # Colors, layout constants, and theming
+│   └── Settings.mc          # Settings cache with typed getters
 └── resources/
-    ├── strings.xml
-    ├── settings.xml
-    ├── properties.xml
-    ├── drawables.xml
+    ├── strings/strings.xml  # UI strings (~100 strings)
+    ├── settings/settings.xml # Settings UI (5 groups, 22 settings)
+    ├── properties.xml       # Default property values
+    ├── drawables/drawables.xml
     └── drawables/launcher_icon.png
 ```
 
@@ -283,4 +284,45 @@ garmin_watch_face/
 - ~~Add battery indicator~~ ✅ Done (top-right corner)
 - ~~GPS-based location~~ ✅ Done (uses last GPS position from activities)
 - ~~Test external weather API on real device~~ ✅ Working!
-- Implement settings screen (ring data sources, timezone, theme)
+- ~~Implement settings screen~~ ✅ Done (22 settings across 6 categories)
+
+### Settings System
+
+**22 Configurable Settings in 5 Groups:**
+
+1. **Time & Date**:
+   - Clock format (12h/24h/System)
+   - Show seconds (on/off)
+   - Date format (3 options)
+   - Show week number (on/off)
+
+2. **World Clocks**:
+   - World clock count (0/1/2)
+   - Timezone 1 (25 cities)
+   - Timezone 2 (25 cities)
+
+3. **Weather Chart**:
+   - Show weather chart (on/off)
+   - Temperature curve (on/off)
+   - Precipitation (on/off)
+   - Clouds (on/off)
+   - Wind (on/off)
+   - Temperature unit (C/F)
+   - Forecast range (48h/72h)
+
+4. **Activity Rings**:
+   - Ring layout (All 3/2 Rings/Off)
+   - Outer ring data (Steps/Floors/Body Battery/HR/Off)
+   - Middle ring data
+   - Inner ring data
+   - Center data (Steps/HR/Off)
+   - Show ring icons (on/off)
+
+5. **Appearance**:
+   - Theme (Dark/Warm/Cool/High Contrast)
+   - Accent color (Teal/Orange/Blue/Purple/Red)
+   - Time color (White/Warm White/Cool White)
+   - Battery display (Always/<50%/<20%/Off)
+
+**City List (25 cities for world clocks):**
+NYC, LAX, CHI, DEN, SAO, MEX, LON, PAR, BER, MAD, ROM, AMS, MOS, DUB, MUM, SIN, HKG, TYO, SEL, SYD, AKL, HNL, ANC, TOR, VAN
