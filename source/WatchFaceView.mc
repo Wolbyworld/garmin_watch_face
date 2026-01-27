@@ -262,7 +262,7 @@ class WatchFaceView extends WatchUi.WatchFace {
         }
 
         // Day separators (dotted lines at midnight)
-        var days = ["S", "M", "T", "W", "T", "F", "S"];  // Single letters
+        var days = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];  // Two-letter abbreviations
         var dayLabelY = chartY + chartHeight + 3;  // Below chart with spacing
 
         for (var i = 6; i < 72; i += 6) {
@@ -278,19 +278,19 @@ class WatchFaceView extends WatchUi.WatchFace {
             }
         }
 
-        // Day labels BELOW the chart - using mini letters, very dim
+        // Day labels BELOW the chart - using mini letters, brighter than before
         // Position labels at center of each day's span
         var hoursUntilMidnight = (24 - currentHour) % 24;
         if (hoursUntilMidnight == 0) { hoursUntilMidnight = 24; }
 
-        var dimLabelColor = Theme.dimColor(Theme.TEXT_DIM, 0.6);
+        var dayLabelColor = Theme.TEXT_DIM;  // Brighter than before (was dimColor 0.6)
 
         // Today's label - center of remaining hours
         var todayCenter = hoursUntilMidnight / 2;
         var todayX = chartX + (todayCenter * chartWidth / 72);
         var todayIdx = (dayOfWeek - 1);
         if (todayIdx < 0) { todayIdx = 6; }
-        drawMiniLetter(dc, todayX - 2, dayLabelY, days[todayIdx], dimLabelColor);
+        drawMiniText(dc, todayX, dayLabelY, days[todayIdx], dayLabelColor);
 
         // Tomorrow's label (day +1)
         var day1Start = hoursUntilMidnight;
@@ -298,7 +298,7 @@ class WatchFaceView extends WatchUi.WatchFace {
         if (day1Center < 72) {
             var day1X = chartX + (day1Center * chartWidth / 72);
             var day1Idx = (dayOfWeek) % 7;
-            drawMiniLetter(dc, day1X - 2, dayLabelY, days[day1Idx], dimLabelColor);
+            drawMiniText(dc, day1X, dayLabelY, days[day1Idx], dayLabelColor);
         }
 
         // Day +2 label
@@ -307,7 +307,7 @@ class WatchFaceView extends WatchUi.WatchFace {
         if (day2Center < 72) {
             var day2X = chartX + (day2Center * chartWidth / 72);
             var day2Idx = (dayOfWeek + 1) % 7;
-            drawMiniLetter(dc, day2X - 2, dayLabelY, days[day2Idx], dimLabelColor);
+            drawMiniText(dc, day2X, dayLabelY, days[day2Idx], dayLabelColor);
         }
 
         // Day +3 label (Thursday if today is Monday)
@@ -316,7 +316,7 @@ class WatchFaceView extends WatchUi.WatchFace {
         if (day3Center < 72) {
             var day3X = chartX + (day3Center * chartWidth / 72);
             var day3Idx = (dayOfWeek + 2) % 7;
-            drawMiniLetter(dc, day3X - 2, dayLabelY, days[day3Idx], dimLabelColor);
+            drawMiniText(dc, day3X, dayLabelY, days[day3Idx], dayLabelColor);
         }
 
         // Temperature boxes (high/low for each visible day) - using mini-digits
@@ -391,9 +391,9 @@ class WatchFaceView extends WatchUi.WatchFace {
         dc.drawText(startX, y, Graphics.FONT_XTINY, dateStr, Graphics.TEXT_JUSTIFY_LEFT);
 
         var fontH = dc.getFontHeight(Graphics.FONT_XTINY);
-        var badgeH = 18;  // Taller to cover number
+        var badgeH = fontH;  // Match font height exactly
         var badgeX = startX + dateWidth + badgeGap;
-        var badgeY = y + (fontH - badgeH) / 2;
+        var badgeY = y;  // Align with text baseline
 
         dc.setColor(Theme.WEEK_BADGE, Graphics.COLOR_TRANSPARENT);
         dc.fillRoundedRectangle(badgeX, badgeY, badgeWidth, badgeH, 4);
@@ -564,29 +564,37 @@ class WatchFaceView extends WatchUi.WatchFace {
         drawRing(dc, ringsX, ringsY, middleR, stroke, floorsProgress, Theme.FLOORS_RING);
         drawRing(dc, ringsX, ringsY, innerR, stroke, bodyBatteryProgress, Theme.BODY_BATTERY_RING);
 
+        // Icons to the right of rings (vertically stacked, matching ring order)
+        var iconX = ringsX + outerR + 10;  // Right of outer ring with gap
+        var iconSpacing = 14;              // Vertical spacing between icons
+        drawStepsIcon(dc, iconX, ringsY - iconSpacing - 5, Theme.STEPS_RING);
+        drawStairsIcon(dc, iconX, ringsY - 5, Theme.FLOORS_RING);
+        drawBodyBatteryIcon(dc, iconX, ringsY + iconSpacing - 5, Theme.BODY_BATTERY_RING);
+
         // Tiny HR in center of rings - using mini-digits (no heart icon)
         drawMiniNumber(dc, ringsX, ringsY, currentHR, Theme.HR_RING);
 
         // Steps count below rings - show full number with more gap
         drawMiniNumber(dc, ringsX, ringsY + outerR + 14, currentSteps, Theme.STEPS_RING);
 
-        // === RIGHT SIDE: Secondary Timezone ===
+        // === RIGHT SIDE: Secondary Timezone (São Paulo, UTC-3) ===
         var tzX = center + 75;
         var tzY = ringsY - 12;
 
-        // Calculate UTC time (or configurable secondary timezone)
+        // Calculate São Paulo time (BRT = UTC-3)
         var clockTime = System.getClockTime();
-        var utcOffset = clockTime.timeZoneOffset / 3600;
-        var utcHour = (clockTime.hour - utcOffset + 24) % 24;
-        var utcMin = clockTime.min;
+        var localOffset = clockTime.timeZoneOffset / 3600;  // Local offset in hours
+        var spOffset = -3;  // São Paulo is UTC-3
+        var spHour = (clockTime.hour - localOffset + spOffset + 48) % 24;
+        var spMin = clockTime.min;
 
         // Time with normal smallest font
         dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(tzX, tzY, Graphics.FONT_XTINY, utcHour.format("%02d") + ":" + utcMin.format("%02d"), Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(tzX, tzY, Graphics.FONT_XTINY, spHour.format("%02d") + ":" + spMin.format("%02d"), Graphics.TEXT_JUSTIFY_CENTER);
 
-        // UTC label below with more spacing
+        // Label below with more spacing
         dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(tzX, tzY + 26, Graphics.FONT_XTINY, "UTC", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(tzX, tzY + 26, Graphics.FONT_XTINY, "SAO", Graphics.TEXT_JUSTIFY_CENTER);
     }
 
     // Mini-digit renderer: draws 8x10 pixel digits
@@ -673,44 +681,123 @@ class WatchFaceView extends WatchUi.WatchFace {
         }
     }
 
-    // Draw mini letter for day labels (8x10 pixels)
+    // Draw mini letter for day labels (9x11 pixels - 1 point bigger than before)
     private function drawMiniLetter(dc, x, y, letter, color) {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        // 8x10 pixel letters
+        // 9x11 pixel letters
         if (letter.equals("M")) {
-            dc.fillRectangle(x, y, 1, 10);     // left
-            dc.fillRectangle(x+7, y, 1, 10);   // right
+            dc.fillRectangle(x, y, 1, 11);     // left
+            dc.fillRectangle(x+8, y, 1, 11);   // right
             dc.fillRectangle(x+1, y+1, 1, 2);  // left inner
-            dc.fillRectangle(x+6, y+1, 1, 2);  // right inner
-            dc.fillRectangle(x+2, y+2, 4, 1);  // center
+            dc.fillRectangle(x+7, y+1, 1, 2);  // right inner
+            dc.fillRectangle(x+2, y+2, 2, 1);  // left diagonal
+            dc.fillRectangle(x+5, y+2, 2, 1);  // right diagonal
+            dc.fillRectangle(x+3, y+3, 3, 1);  // center
         } else if (letter.equals("T")) {
-            dc.fillRectangle(x, y, 8, 1);      // top
-            dc.fillRectangle(x+3, y+1, 2, 9);  // center
+            dc.fillRectangle(x, y, 9, 1);      // top
+            dc.fillRectangle(x+4, y+1, 1, 10); // center (1px wide like other letters)
         } else if (letter.equals("W")) {
-            dc.fillRectangle(x, y, 1, 10);     // left
-            dc.fillRectangle(x+7, y, 1, 10);   // right
-            dc.fillRectangle(x+3, y+5, 2, 4);  // center
-            dc.fillRectangle(x+1, y+8, 2, 1);  // left inner
-            dc.fillRectangle(x+5, y+8, 2, 1);  // right inner
+            dc.fillRectangle(x, y, 1, 11);     // left
+            dc.fillRectangle(x+8, y, 1, 11);   // right
+            dc.fillRectangle(x+4, y+5, 1, 5);  // center
+            dc.fillRectangle(x+1, y+9, 3, 1);  // left inner
+            dc.fillRectangle(x+5, y+9, 3, 1);  // right inner
         } else if (letter.equals("F")) {
-            dc.fillRectangle(x, y, 8, 1);      // top
-            dc.fillRectangle(x, y+1, 1, 9);    // left
-            dc.fillRectangle(x+1, y+4, 5, 1);  // middle
+            dc.fillRectangle(x, y, 9, 1);      // top
+            dc.fillRectangle(x, y+1, 1, 10);   // left
+            dc.fillRectangle(x+1, y+5, 5, 1);  // middle
         } else if (letter.equals("S")) {
             dc.fillRectangle(x+1, y, 7, 1);    // top
-            dc.fillRectangle(x, y+1, 1, 3);    // left upper
-            dc.fillRectangle(x+1, y+4, 6, 1);  // middle
-            dc.fillRectangle(x+7, y+5, 1, 4);  // right lower
-            dc.fillRectangle(x, y+9, 7, 1);    // bottom
+            dc.fillRectangle(x, y+1, 1, 4);    // left upper
+            dc.fillRectangle(x+1, y+5, 7, 1);  // middle
+            dc.fillRectangle(x+8, y+6, 1, 4);  // right lower
+            dc.fillRectangle(x+1, y+10, 7, 1); // bottom
         } else if (letter.equals("U")) {
-            dc.fillRectangle(x, y, 1, 9);      // left
-            dc.fillRectangle(x+7, y, 1, 9);    // right
-            dc.fillRectangle(x+1, y+9, 6, 1);  // bottom
-        } else if (letter.equals("C")) {
+            dc.fillRectangle(x, y, 1, 10);     // left
+            dc.fillRectangle(x+8, y, 1, 10);   // right
+            dc.fillRectangle(x+1, y+10, 7, 1); // bottom
+        } else if (letter.equals("O")) {
             dc.fillRectangle(x+1, y, 7, 1);    // top
-            dc.fillRectangle(x, y+1, 1, 8);    // left
-            dc.fillRectangle(x+1, y+9, 7, 1);  // bottom
+            dc.fillRectangle(x, y+1, 1, 9);    // left
+            dc.fillRectangle(x+8, y+1, 1, 9);  // right
+            dc.fillRectangle(x+1, y+10, 7, 1); // bottom
+        } else if (letter.equals("H")) {
+            dc.fillRectangle(x, y, 1, 11);     // left
+            dc.fillRectangle(x+8, y, 1, 11);   // right
+            dc.fillRectangle(x+1, y+5, 7, 1);  // middle
+        } else if (letter.equals("R")) {
+            dc.fillRectangle(x, y, 1, 11);     // left
+            dc.fillRectangle(x+1, y, 7, 1);    // top
+            dc.fillRectangle(x+8, y+1, 1, 4);  // right upper
+            dc.fillRectangle(x+1, y+5, 7, 1);  // middle
+            dc.fillRectangle(x+5, y+6, 1, 2);  // diagonal upper
+            dc.fillRectangle(x+6, y+8, 1, 1);  // diagonal mid
+            dc.fillRectangle(x+7, y+9, 2, 2);  // diagonal lower
+        } else if (letter.equals("A")) {
+            dc.fillRectangle(x+3, y, 3, 1);    // top
+            dc.fillRectangle(x+1, y+1, 2, 1);  // left upper
+            dc.fillRectangle(x+6, y+1, 2, 1);  // right upper
+            dc.fillRectangle(x, y+2, 1, 9);    // left
+            dc.fillRectangle(x+8, y+2, 1, 9);  // right
+            dc.fillRectangle(x+1, y+5, 7, 1);  // middle
+        } else if (letter.equals("E")) {
+            dc.fillRectangle(x, y, 9, 1);      // top
+            dc.fillRectangle(x, y+1, 1, 9);    // left
+            dc.fillRectangle(x+1, y+5, 5, 1);  // middle
+            dc.fillRectangle(x, y+10, 9, 1);   // bottom
         }
+    }
+
+    // Draw mini text (multiple letters) centered at x,y
+    private function drawMiniText(dc, centerX, y, text, color) {
+        var len = text.length();
+        var letterWidth = 10;  // 9px letter + 1px gap
+        var totalWidth = len * letterWidth - 1;
+        var startX = centerX - totalWidth / 2;
+
+        for (var i = 0; i < len; i++) {
+            var letter = text.substring(i, i+1);
+            drawMiniLetter(dc, startX + i * letterWidth, y, letter, color);
+        }
+    }
+
+    // Draw footprint icon for steps (9x10 pixels)
+    private function drawStepsIcon(dc, x, y, color) {
+        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+        // Left foot
+        dc.fillRectangle(x, y+2, 2, 5);      // sole
+        dc.fillRectangle(x+2, y+3, 1, 3);    // arch
+        dc.fillRectangle(x, y, 2, 1);        // toe
+        // Right foot (offset down and right)
+        dc.fillRectangle(x+5, y+5, 2, 5);    // sole
+        dc.fillRectangle(x+4, y+6, 1, 3);    // arch
+        dc.fillRectangle(x+5, y+3, 2, 1);    // toe
+    }
+
+    // Draw stairs icon (9x10 pixels)
+    private function drawStairsIcon(dc, x, y, color) {
+        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+        // Three steps going up-right
+        dc.fillRectangle(x, y+8, 3, 2);      // bottom step
+        dc.fillRectangle(x+3, y+5, 3, 2);    // middle step
+        dc.fillRectangle(x+6, y+2, 3, 2);    // top step
+        // Risers (vertical parts)
+        dc.fillRectangle(x+3, y+7, 1, 3);    // bottom riser
+        dc.fillRectangle(x+6, y+4, 1, 3);    // middle riser
+    }
+
+    // Draw battery icon for body battery (9x10 pixels)
+    private function drawBodyBatteryIcon(dc, x, y, color) {
+        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+        // Battery outline
+        dc.fillRectangle(x, y+1, 8, 1);      // top
+        dc.fillRectangle(x, y+9, 8, 1);      // bottom
+        dc.fillRectangle(x, y+2, 1, 7);      // left
+        dc.fillRectangle(x+7, y+2, 1, 7);    // right
+        // Positive terminal (bump on top)
+        dc.fillRectangle(x+3, y, 3, 1);
+        // Fill inside (shows it's charged)
+        dc.fillRectangle(x+2, y+3, 4, 5);
     }
 
     private function drawRing(dc, x, y, radius, stroke, progress, color) {
