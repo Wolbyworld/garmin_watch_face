@@ -85,12 +85,13 @@ The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face t
 ## Status
 - Design approved by user
 - **Working implementation** - all major features functional and tested on real device
-- Custom mini-digit renderer (7x9 pixels) for tiny text where FONT_XTINY is too large
+- Custom mini-digit renderer (8x10 pixels) and mini-letter renderer (9x11 pixels) for tiny text
+- Day labels: 2-character abbreviations (MO, TU, WE, TH, FR, SA, SU) using custom mini-letters
 - Organic cloud shapes using overlapping circles
-- Activity rings with HR in center, steps below
-- Secondary timezone (UTC) display
+- Activity rings with HR (+ heart icon) in center, steps below
+- Two secondary timezones: São Paulo (UTC-3) and San Francisco (UTC-8)
 - **External Weather API (Open-Meteo)** ✅ Working on real device!
-  - Fetches from Open-Meteo every 30 minutes via background service
+  - Fetches 4 days of data every 30 minutes via background service (UI shows 72h)
   - Uses last GPS position from activities (updates when you run/bike)
   - Falls back to Garmin API if no GPS position or external data unavailable
 - **Time fill visual fix** - Scaled by 1.5x so visual fill matches perceived completion
@@ -183,32 +184,25 @@ Go for a run in new city → Position updates → Weather now shows new location
 
 **Open-Meteo API endpoint:**
 ```
-https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,precipitation_probability,cloudcover,windspeed_10m&forecast_days=3&timezone=auto
+https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,precipitation_probability,cloudcover,windspeed_10m&forecast_days=4&timezone=auto
 ```
+Note: We request 4 days even though UI shows 72h, to ensure full coverage regardless of current time of day.
 
-### Custom Mini-Digit Renderer
+### Custom Mini-Digit and Mini-Letter Renderers
 **Problem**: `FONT_XTINY` is the smallest Garmin font but still too large for some UI elements (temp boxes on chart, HR in ring center, day labels).
 
-**Solution**: Custom pixel-based digit/letter renderer drawing 7x9 pixel characters using `fillRectangle()`:
-```monkeyc
-// Draw a 6x8 pixel digit
-private function drawMiniDigit(dc, x, y, digit, color) {
-    dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-    if (digit == 0) {
-        dc.fillRectangle(x+1, y, 4, 1);    // top
-        dc.fillRectangle(x+1, y+7, 4, 1);  // bottom
-        dc.fillRectangle(x, y+1, 1, 6);    // left
-        dc.fillRectangle(x+5, y+1, 1, 6);  // right
-    }
-    // ... etc for 1-9
-}
+**Solution**: Custom pixel-based renderers using `fillRectangle()`:
+- `drawMiniDigit()` - 8x10 pixel digits (0-9) for numbers
+- `drawMiniLetter()` - 9x11 pixel letters (M, T, W, F, S, U, O, H, R, A, E) for day labels
+- `drawMiniNumber()` - Wrapper for multi-digit numbers (supports negative)
+- `drawMiniText()` - Wrapper for multi-letter text, centered
 
-// Wrapper to draw multi-digit numbers (supports negative)
-private function drawMiniNumber(dc, centerX, centerY, number, color) {
-    var isNegative = number < 0;
-    if (isNegative) { number = -number; }
-    // Draw minus sign if needed, then each digit
-}
+```monkeyc
+// Draw two-letter day labels centered at position
+drawMiniText(dc, centerX, y, "TU", color);
+
+// Draw numbers (HR, steps, temps)
+drawMiniNumber(dc, centerX, centerY, 68, color);
 ```
 
 ### Organic Cloud Rendering
@@ -231,8 +225,30 @@ if (cloudCoverage > 50) {
 ### UI Layout Tips
 - **Header spacing**: Use at least 20px between stacked text lines to avoid overlap
 - **Ring center text**: Mini-digits work well for HR display in activity rings
-- **Week badge**: Size badge 24x18px to fully contain week number text
-- **Day labels**: Single letters (M, T, W, T, F, S) using mini-letters save space
+- **Week badge**: Height matches font height for vertical alignment with date text
+- **Day labels**: Two-letter abbreviations (MO, TU, WE, TH, FR, SA, SU) using 9x11 mini-letters
+- **Secondary timezones**: Two timezones (SAO + SFO) stacked vertically with label on left, time on right
+- **Icon spacing**: 18px vertical spacing works well for 9x10 pixel icons
+
+### Round Display Layout Considerations
+The 454x454 display is circular, so elements near the edges get clipped. Key learnings:
+
+1. **Horizontal text on same line**: When placing label + value side by side (e.g., "SAO 07:14"), use 50-65px gap between them. `FONT_XTINY` text is wider than expected - a 3-letter label like "SAO" takes ~30px.
+
+2. **Vertical stacking for multiple items**: When showing multiple data points (like two timezones), stack vertically with 40px total spread. Each row: label left-justified, time right of label with large gap.
+
+3. **Edge cutoff at corners**: At Y positions far from center (like ringsY ± 30), the horizontal safe area shrinks. Test elements near edges - if text gets cut, move the whole block toward center.
+
+4. **Positioning formula for bottom-right area** (timezones):
+   ```monkeyc
+   var tzX = center + 80;           // Base X position
+   var labelX = tzX - 80;           // Labels far left
+   var timeX = tzX - 15;            // Times left of edge
+   var tzY1 = ringsY - 30;          // First row (higher)
+   var tzY2 = ringsY + 10;          // Second row (lower)
+   ```
+
+5. **Heart icon with HR**: Use compact 6x5 pixel heart icon. Position heart to left of HR number, adjust based on digit count (2 vs 3 digits for HR ≥100) to keep centered in ring.
 
 ### Project Structure (Simplified)
 ```
