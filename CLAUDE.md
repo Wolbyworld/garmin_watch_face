@@ -60,17 +60,18 @@ The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face t
 - **Language**: Monkey C (Garmin Connect IQ)
 - **Target API level**: 5.0+ (for AMOLED luminance-based burn-in heuristics)
 - **Target device**: fenix8 47mm AMOLED (device ID: `fenix847mm` or similar -- verify in CIQ SDK)
-- **Weather data**: Use `Garmin.Weather.getHourlyForecast()` and `Garmin.Weather.getCurrentConditions()` from the built-in CIQ Weather API
+- **Weather data**: Primary: Open-Meteo API (via background service). Fallback: Garmin Weather API
+- **Location**: Uses last GPS position from activities (updates when you run/bike/hike with GPS)
 - **Build system**: monkey.jungle file
 
 ## Architecture Notes
-- **Theme.mc**: Module holding all color constants and spacing values as a dictionary/object. Easy to swap.
-- **WeatherChart.mc**: Class responsible for drawing the multi-layer weather forecast chart on a Dc context. This is the most complex component.
-- **WatchFaceView.mc**: Main view extending WatchUi.WatchFace, orchestrates layout and calls sub-renderers.
-- **WatchFaceDelegate.mc**: Handles power mode transitions (sleep/wake for AOD).
-- **DataFields.mc**: Renders the bottom stats area (HR, steps, data field, move bar).
-- **TimeRenderer.mc**: Draws time digits with the step-goal fill effect.
-- Settings via CIQ properties for: units (C/F, km/mi), 12/24h, data field selection, theme selection.
+- **WatchFaceApp.mc**: App entry point, provides `getServiceDelegate()` for background weather service
+- **WatchFaceView.mc**: Main view - all rendering (weather chart, time, stats, rings, AOD)
+- **WatchFaceDelegate.mc**: Handles power mode transitions (sleep/wake for AOD)
+- **WeatherService.mc**: Background service that fetches from Open-Meteo API every 30 min
+- **WeatherDataManager.mc**: Module that caches weather data, tries external first then Garmin API
+- **Theme.mc**: Module holding all color constants and spacing values
+- Settings via CIQ properties for: units (C/F, km/mi), 12/24h, data field selection, theme selection
 
 ## Key CIQ APIs to Use
 - `WatchUi.WatchFace` / `WatchUi.WatchFaceDelegate`
@@ -83,16 +84,15 @@ The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face t
 
 ## Status
 - Design approved by user
-- **Working implementation** - all major features functional
+- **Working implementation** - all major features functional and tested on real device
 - Custom mini-digit renderer (7x9 pixels) for tiny text where FONT_XTINY is too large
 - Organic cloud shapes using overlapping circles
 - Activity rings with HR in center, steps below
 - Secondary timezone (UTC) display
-- **Weather API integrated** via WeatherDataManager.mc (Garmin API fallback with 15-min cache)
-- **External Weather API (Open-Meteo)** implemented via WeatherService.mc background service
-  - Fetches from Open-Meteo every 30 minutes via temporal event
-  - Stores in Application.Storage, WeatherDataManager reads from storage
-  - Falls back to Garmin API if external data unavailable
+- **External Weather API (Open-Meteo)** ✅ Working on real device!
+  - Fetches from Open-Meteo every 30 minutes via background service
+  - Uses last GPS position from activities (updates when you run/bike)
+  - Falls back to Garmin API if no GPS position or external data unavailable
 - **Time fill visual fix** - Scaled by 1.5x so visual fill matches perceived completion
 
 ## Learnings from Development (January 2026)
@@ -154,6 +154,37 @@ SDK_PATH="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-
    - Returns `null` if no weather data available - always check!
 
 6. **Number conversions**: Use `.toFloat()` and `.toNumber()` explicitly for arithmetic
+
+### External Weather API (Open-Meteo)
+
+**How it works:**
+1. Background service (`WeatherService.mc`) runs every 30 minutes
+2. Gets last GPS position via `Position.getInfo()` (cached from previous activities)
+3. Fetches weather from Open-Meteo API (free, no API key needed)
+4. Stores data in `Application.Storage`
+5. `WeatherDataManager.mc` reads from storage on next screen refresh
+6. Falls back to Garmin Weather API if no external data available
+
+**GPS Location Flow:**
+```
+You go for a run with GPS → Watch caches position → Background service uses it
+                                                            ↓
+Travel to new city → Old position still cached → Weather shows old location
+                                                            ↓
+Go for a run in new city → Position updates → Weather now shows new location
+```
+
+**Permissions required:**
+```xml
+<iq:uses-permission id="Background"/>      <!-- Background service -->
+<iq:uses-permission id="Communications"/>  <!-- HTTP requests -->
+<iq:uses-permission id="Positioning"/>     <!-- Read GPS position -->
+```
+
+**Open-Meteo API endpoint:**
+```
+https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,precipitation_probability,cloudcover,windspeed_10m&forecast_days=3&timezone=auto
+```
 
 ### Custom Mini-Digit Renderer
 **Problem**: `FONT_XTINY` is the smallest Garmin font but still too large for some UI elements (temp boxes on chart, HR in ring center, day labels).
@@ -234,6 +265,6 @@ garmin_watch_face/
 - ~~Read actual Body Battery~~ ✅ Done (SensorHistory.getBodyBatteryHistory)
 - ~~Read actual HR~~ ✅ Done (Activity.getActivityInfo + ActivityMonitor.getHeartRateHistory)
 - ~~Add battery indicator~~ ✅ Done (top-right corner)
-- Add location setting in settings.xml (currently defaults to Madrid)
+- ~~GPS-based location~~ ✅ Done (uses last GPS position from activities)
+- ~~Test external weather API on real device~~ ✅ Working!
 - Implement settings screen (ring data sources, timezone, theme)
-- Test external weather API on real device
