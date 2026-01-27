@@ -49,12 +49,12 @@ class WeatherService extends System.ServiceDelegate {
 
         // Build Open-Meteo API URL
         // Requesting: temperature, precipitation probability, cloud cover, wind speed
-        // 3 days of hourly data
+        // 4 days of hourly data (UI shows 72h, but need 4 days to cover all time-of-day cases)
         var url = "https://api.open-meteo.com/v1/forecast" +
             "?latitude=" + lat.format("%.4f") +
             "&longitude=" + lon.format("%.4f") +
             "&hourly=temperature_2m,precipitation_probability,cloudcover,windspeed_10m" +
-            "&forecast_days=3" +
+            "&forecast_days=4" +
             "&timezone=auto";
 
         var options = {

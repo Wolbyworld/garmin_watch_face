@@ -566,35 +566,58 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         // Icons to the right of rings (vertically stacked, matching ring order)
         var iconX = ringsX + outerR + 10;  // Right of outer ring with gap
-        var iconSpacing = 14;              // Vertical spacing between icons
+        var iconSpacing = 18;              // Vertical spacing between icons
         drawStepsIcon(dc, iconX, ringsY - iconSpacing - 5, Theme.STEPS_RING);
         drawStairsIcon(dc, iconX, ringsY - 5, Theme.FLOORS_RING);
         drawBodyBatteryIcon(dc, iconX, ringsY + iconSpacing - 5, Theme.BODY_BATTERY_RING);
 
-        // Tiny HR in center of rings - using mini-digits (no heart icon)
-        drawMiniNumber(dc, ringsX, ringsY, currentHR, Theme.HR_RING);
+        // HR in center of rings - heart icon close to number
+        // Adjust position based on digit count to avoid touching inner ring
+        var hrDigits = currentHR >= 100 ? 3 : 2;
+        var hrTotalWidth = (hrDigits * 9) + 8;  // digits + heart + gap
+        var hrStartX = ringsX - (hrTotalWidth / 2);
+        drawHeartIcon(dc, hrStartX, ringsY - 2, Theme.HR_RING);
+        drawMiniNumber(dc, ringsX + 5, ringsY, currentHR, Theme.HR_RING);
 
-        // Steps count below rings - show full number with more gap
+        // Steps count below rings - using mini-digits
         drawMiniNumber(dc, ringsX, ringsY + outerR + 14, currentSteps, Theme.STEPS_RING);
 
-        // === RIGHT SIDE: Secondary Timezone (São Paulo, UTC-3) ===
-        var tzX = center + 75;
-        var tzY = ringsY - 12;
-
-        // Calculate São Paulo time (BRT = UTC-3)
+        // === RIGHT SIDE: Secondary Timezones (São Paulo + San Francisco) ===
+        // Stacked vertically with clear separation
+        var tzX = center + 80;
         var clockTime = System.getClockTime();
         var localOffset = clockTime.timeZoneOffset / 3600;  // Local offset in hours
-        var spOffset = -3;  // São Paulo is UTC-3
+
+        // São Paulo time (BRT = UTC-3)
+        var spOffset = -3;
         var spHour = (clockTime.hour - localOffset + spOffset + 48) % 24;
         var spMin = clockTime.min;
 
-        // Time with normal smallest font
-        dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(tzX, tzY, Graphics.FONT_XTINY, spHour.format("%02d") + ":" + spMin.format("%02d"), Graphics.TEXT_JUSTIFY_CENTER);
+        // San Francisco time (PST/PDT = UTC-8/-7, using -8 for simplicity)
+        var sfOffset = -8;
+        var sfHour = (clockTime.hour - localOffset + sfOffset + 48) % 24;
+        var sfMin = clockTime.min;
 
-        // Label below with more spacing
+        // Vertical layout: SAO on top, SFO below
+        // Each timezone: label on left, time on right (same line)
+        var tzY1 = ringsY - 30;  // SAO row (higher)
+        var tzY2 = ringsY + 10;  // SFO row (moved up to avoid bottom cutoff)
+
+        // Positions: move everything left, more gap between label and time
+        var labelX = tzX - 80;  // Labels much further left
+        var timeX = tzX - 15;   // Times moved left too (avoid edge cutoff)
+
+        // São Paulo: "SAO 07:02"
         dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(tzX, tzY + 26, Graphics.FONT_XTINY, "SAO", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(labelX, tzY1, Graphics.FONT_XTINY, "SAO", Graphics.TEXT_JUSTIFY_LEFT);
+        dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(timeX, tzY1, Graphics.FONT_XTINY, spHour.format("%02d") + ":" + spMin.format("%02d"), Graphics.TEXT_JUSTIFY_LEFT);
+
+        // San Francisco: "SFO 05:02"
+        dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(labelX, tzY2, Graphics.FONT_XTINY, "SFO", Graphics.TEXT_JUSTIFY_LEFT);
+        dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(timeX, tzY2, Graphics.FONT_XTINY, sfHour.format("%02d") + ":" + sfMin.format("%02d"), Graphics.TEXT_JUSTIFY_LEFT);
     }
 
     // Mini-digit renderer: draws 8x10 pixel digits
@@ -798,6 +821,19 @@ class WatchFaceView extends WatchUi.WatchFace {
         dc.fillRectangle(x+3, y, 3, 1);
         // Fill inside (shows it's charged)
         dc.fillRectangle(x+2, y+3, 4, 5);
+    }
+
+    // Draw heart icon for HR (6x5 pixels - compact)
+    private function drawHeartIcon(dc, x, y, color) {
+        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+        // Two bumps at top
+        dc.fillRectangle(x, y, 2, 2);        // left bump
+        dc.fillRectangle(x+4, y, 2, 2);      // right bump
+        dc.fillRectangle(x+2, y+1, 2, 1);    // bridge
+        // Body and point
+        dc.fillRectangle(x, y+2, 6, 1);      // widest part
+        dc.fillRectangle(x+1, y+3, 4, 1);    // narrowing
+        dc.fillRectangle(x+2, y+4, 2, 1);    // point
     }
 
     private function drawRing(dc, x, y, radius, stroke, progress, color) {
