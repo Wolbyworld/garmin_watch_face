@@ -531,7 +531,8 @@ class WatchFaceView extends WatchUi.WatchFace {
         }
         if (stepProgress > 1.0) { stepProgress = 1.0; }
 
-        var timeFont = Graphics.FONT_NUMBER_HOT;
+        // Use smaller font on MIP displays - NUMBER_HOT may not exist on all devices
+        var timeFont = Theme.isMIPDisplay ? Graphics.FONT_NUMBER_MEDIUM : Graphics.FONT_NUMBER_HOT;
         var fontHeight = dc.getFontHeight(timeFont);
 
         var textTop = baseY - (fontHeight / 2);

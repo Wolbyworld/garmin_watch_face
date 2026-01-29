@@ -1,7 +1,7 @@
-# Garmin OLED Weather Watch Face
+# Garmin Weather Watch Face
 
 ## Project Goal
-Build a Connect IQ watch face for **Garmin Fenix 8 47mm AMOLED (454x454 pixels)** that recreates the "Rain & Clouds" style weather watch face but redesigned for OLED displays.
+Build a Connect IQ watch face that supports both **Garmin Fenix 8 47mm AMOLED (454x454 pixels)** and **Fenix 6S MIP (240x240 pixels)**. The design recreates the "Rain & Clouds" style weather watch face, optimized for each display type.
 
 ## Reference Images
 The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face that was designed for older MIP (280x280) displays. It looks ugly on the high-res AMOLED. The goal is to preserve all the same data elements but with a modern OLED-optimized design.
@@ -58,8 +58,11 @@ The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face t
 
 ## Technical Stack
 - **Language**: Monkey C (Garmin Connect IQ)
-- **Target API level**: 5.0+ (for AMOLED luminance-based burn-in heuristics)
-- **Target device**: fenix8 47mm AMOLED (device ID: `fenix847mm` or similar -- verify in CIQ SDK)
+- **Target API level**: 3.4.0 (for Fenix 6S compatibility)
+- **Target devices**:
+  - Fenix 8 AMOLED: `fenix847mm`, `fenix8solar47mm`, `fenix851mm`, `fenix8solar51mm`
+  - Fenix 6S MIP: `fenix6s`, `fenix6spro`
+  - Also: `venu2`, `venu2s`, `venu3`, `venu3s`, `epix2pro47mm`, `epix2pro51mm`
 - **Weather data**: Primary: Open-Meteo API (via background service). Fallback: Garmin Weather API
 - **Location**: Uses last GPS position from activities (updates when you run/bike/hike with GPS)
 - **Build system**: monkey.jungle file
@@ -97,6 +100,13 @@ The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face t
   - Falls back to Garmin API if external data unavailable
   - Red warning cloud shown when using default location (no GPS data)
 - **Time fill visual fix** - Scaled by 1.5x so visual fill matches perceived completion
+- **Fenix 6S MIP Support** ✅ Added
+  - Simplified layout optimized for 240x240 display
+  - No activity rings (too small for MIP)
+  - Centered world clocks at bottom
+  - HR + battery row at very bottom
+  - Simple single-circle clouds (no alpha blending on MIP)
+  - MIP 64-color palette mapping
 
 ## Learnings from Development (January 2026)
 
@@ -373,3 +383,51 @@ garmin_watch_face/
 
 **City List (25 cities for world clocks):**
 NYC, LAX, CHI, DEN, SAO, MEX, LON, PAR, BER, MAD, ROM, AMS, MOS, DUB, MUM, SIN, HKG, TYO, SEL, SYD, AKL, HNL, ANC, TOR, VAN
+
+### Fenix 6S MIP Layout (Simplified)
+
+The Fenix 6S uses a 240x240 MIP display with only 64 colors (no alpha blending). The layout is simplified:
+
+```
+┌─────────────────────────┐
+│     18° • Pozuelo      │  ← Header: temp + location (smaller)
+│                         │
+│  ▓▓▓ Weather Chart ▓▓▓  │  ← Weather chart (simplified, ~40px height)
+│  MO   TU   WE   TH      │
+│                         │
+│     tue 15 jan [W03]    │  ← Date with week badge
+│                         │
+│        12:34            │  ← Time (main focus)
+│          :56 PM         │  ← Seconds + AM/PM
+│                         │
+│     SAO 07:14           │  ← World clocks (CENTERED)
+│     SFO 04:14           │
+│      ♥ 68  🔋 85%       │  ← HR + Battery (bottom row)
+└─────────────────────────┘
+```
+
+**Removed for MIP:**
+- Activity rings (too small at 240px)
+- Apple-style overflow effect
+- Ring center cycling data
+- Ring icons
+- Organic multi-circle clouds (replaced with simple circles)
+
+**MIP 64-Color Palette:**
+Colors are quantized to 6 levels per channel: `0x00`, `0x55`, `0xAA`, `0xFF`
+
+### Build Commands
+
+```bash
+SDK_PATH="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-8.4.0-2025-12-03-5122605dc"
+
+# Build for Fenix 8 AMOLED
+"$SDK_PATH/bin/monkeyc" -d fenix847mm -f monkey.jungle -o watchface-f8.prg -y developer_key.der
+
+# Build for Fenix 6S MIP
+"$SDK_PATH/bin/monkeyc" -d fenix6s -f monkey.jungle -o watchface-f6s.prg -y developer_key.der
+
+# Run in simulator
+"$SDK_PATH/bin/monkeydo" watchface-f6s.prg fenix6s
+"$SDK_PATH/bin/monkeydo" watchface-f8.prg fenix847mm
+```
