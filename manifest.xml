@@ -5,7 +5,7 @@
                     name="@Strings.AppName"
                     entry="WatchFaceApp"
                     launcherIcon="@Drawables.LauncherIcon"
-                    minApiLevel="5.0.0">
+                    minApiLevel="3.4.0">
         <iq:products>
             <!-- Fenix 8 AMOLED variants -->
             <iq:product id="fenix8solar47mm"/>
@@ -19,6 +19,9 @@
             <iq:product id="venu3s"/>
             <iq:product id="epix2pro47mm"/>
             <iq:product id="epix2pro51mm"/>
+            <!-- Fenix 6S MIP variants -->
+            <iq:product id="fenix6s"/>
+            <iq:product id="fenix6spro"/>
         </iq:products>
         <iq:permissions>
             <iq:uses-permission id="Background"/>

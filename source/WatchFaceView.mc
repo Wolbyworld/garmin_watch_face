@@ -73,6 +73,11 @@ class WatchFaceView extends WatchUi.WatchFace {
     }
 
     private function drawBattery(dc) {
+        // On MIP displays, battery is shown in the stats row at bottom
+        if (Theme.isMIPDisplay) {
+            return;
+        }
+
         var stats = System.getSystemStats();
         var battery = stats.battery.toNumber();
 
@@ -132,17 +137,22 @@ class WatchFaceView extends WatchUi.WatchFace {
         // Check if using default location (no GPS data)
         var usingDefault = Application.Storage.getValue("using_default_location");
 
+        // Scale Y positions for MIP
+        var tempY = Theme.isMIPDisplay ? 5 : 7;
+        var cityY = Theme.isMIPDisplay ? 22 : 30;
+
         // Temperature on line 1 (centered, brighter)
-        dc.setColor(Theme.TIME_PRIMARY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(center, 7, Graphics.FONT_XTINY, tempStr, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.setColor(Theme.getColor(Theme.TIME_PRIMARY), Graphics.COLOR_TRANSPARENT);
+        dc.drawText(center, tempY, Graphics.FONT_XTINY, tempStr, Graphics.TEXT_JUSTIFY_CENTER);
 
         // City on line 2 (centered, dimmer)
-        dc.setColor(Theme.TEXT_SECONDARY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(center, 30, Graphics.FONT_XTINY, locationStr, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.setColor(Theme.getColor(Theme.TEXT_SECONDARY), Graphics.COLOR_TRANSPARENT);
+        dc.drawText(center, cityY, Graphics.FONT_XTINY, locationStr, Graphics.TEXT_JUSTIFY_CENTER);
 
         // Show red warning cloud if using default location
         if (usingDefault == true) {
-            drawWarningCloud(dc, center + 55, 30);
+            var cloudX = Theme.isMIPDisplay ? center + 40 : center + 55;
+            drawWarningCloud(dc, cloudX, cityY);
         }
     }
 
@@ -159,11 +169,11 @@ class WatchFaceView extends WatchUi.WatchFace {
     }
 
     private function drawWeatherChart(dc) {
-        // Chart dimensions
-        var chartX = 45;
-        var chartY = 70;
-        var chartWidth = Theme.screenWidth - 90;
-        var chartHeight = 80;
+        // Chart dimensions - scale for MIP displays
+        var chartX = Theme.isMIPDisplay ? 20 : 45;
+        var chartY = Theme.isMIPDisplay ? 50 : 70;
+        var chartWidth = Theme.screenWidth - (Theme.isMIPDisplay ? 40 : 90);
+        var chartHeight = Theme.isMIPDisplay ? Theme.getChartHeightMIP() : 80;
 
         var now = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
         var currentHour = now.hour;
@@ -207,27 +217,49 @@ class WatchFaceView extends WatchUi.WatchFace {
                 var c = clouds[i];
                 if (c > 35) {
                     var x = chartX + (i * chartWidth / forecastHours);
-                    var opacity = (c - 35).toFloat() / 65.0;
-                    var cloudColor = Theme.dimColor(Theme.CLOUD_COLOR, opacity * 0.35);
+
+                    // MIP displays: use solid gray (no alpha blending)
+                    // AMOLED: use opacity-based dimming
+                    var cloudColor;
+                    if (Theme.isMIPDisplay) {
+                        // MIP: use palette-safe grays based on coverage
+                        if (c > 70) {
+                            cloudColor = 0xAAAAAA;  // Light gray for heavy clouds
+                        } else if (c > 50) {
+                            cloudColor = 0x555555;  // Medium gray
+                        } else {
+                            cloudColor = 0x555555;  // Dim gray for light clouds
+                        }
+                    } else {
+                        var opacity = (c - 35).toFloat() / 65.0;
+                        cloudColor = Theme.dimColor(Theme.CLOUD_COLOR, opacity * 0.35);
+                    }
                     dc.setColor(cloudColor, Graphics.COLOR_TRANSPARENT);
 
-                    // Draw puffy cloud shape with multiple overlapping circles
+                    // Draw cloud shape - simplified for MIP
                     var baseY = chartY + 6;
 
-                    // Main body - row of circles
-                    dc.fillCircle(x + 4, baseY, 4);
-                    dc.fillCircle(x + 10, baseY, 5);
-                    dc.fillCircle(x + 17, baseY, 4);
+                    if (Theme.isMIPDisplay) {
+                        // MIP: simple single circles
+                        var radius = c > 60 ? 3 : 2;
+                        dc.fillCircle(x + 5, baseY, radius);
+                    } else {
+                        // AMOLED: organic puffy clouds
+                        // Main body - row of circles
+                        dc.fillCircle(x + 4, baseY, 4);
+                        dc.fillCircle(x + 10, baseY, 5);
+                        dc.fillCircle(x + 17, baseY, 4);
 
-                    // Top puffs - slightly higher
-                    if (c > 50) {
-                        dc.fillCircle(x + 7, baseY - 3, 3);
-                        dc.fillCircle(x + 13, baseY - 3, 3);
-                    }
+                        // Top puffs - slightly higher
+                        if (c > 50) {
+                            dc.fillCircle(x + 7, baseY - 3, 3);
+                            dc.fillCircle(x + 13, baseY - 3, 3);
+                        }
 
-                    // Extra puffs for very cloudy
-                    if (c > 70) {
-                        dc.fillCircle(x + 10, baseY - 5, 2);
+                        // Extra puffs for very cloudy
+                        if (c > 70) {
+                            dc.fillCircle(x + 10, baseY - 5, 2);
+                        }
                     }
                 }
             }
@@ -413,7 +445,7 @@ class WatchFaceView extends WatchUi.WatchFace {
     }
 
     private function drawDate(dc) {
-        var y = 172;
+        var y = Theme.isMIPDisplay ? (Theme.screenHeight * 0.40).toNumber() : 172;
         var center = Theme.getCenter();
         var now = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
 
@@ -472,7 +504,7 @@ class WatchFaceView extends WatchUi.WatchFace {
     private function drawTime(dc) {
         var clockTime = System.getClockTime();
         var center = Theme.getCenter();
-        var baseY = 268;
+        var baseY = Theme.isMIPDisplay ? (Theme.screenHeight * 0.56).toNumber() : 268;
 
         var hour = clockTime.hour;
         var min = clockTime.min;
@@ -540,18 +572,115 @@ class WatchFaceView extends WatchUi.WatchFace {
 
     private function drawStats(dc) {
         var center = Theme.getCenter();
-        var ringLayout = Settings.getRingLayout();
 
-        // === LEFT SIDE: Activity Rings ===
-        if (ringLayout != 2) {  // Not "Off"
-            drawActivityRings(dc, center);
+        if (Theme.isMIPDisplay) {
+            // MIP layout: simplified - no activity rings, centered world clocks + HR/battery row
+            drawStatsMIP(dc, center);
+        } else {
+            // AMOLED layout: rings on left, world clocks on right
+            var ringLayout = Settings.getRingLayout();
+
+            // === LEFT SIDE: Activity Rings ===
+            if (ringLayout != 2) {  // Not "Off"
+                drawActivityRings(dc, center);
+            }
+
+            // === RIGHT SIDE: World Clocks ===
+            var worldClockCount = Settings.getWorldClockCount();
+            if (worldClockCount > 0) {
+                drawWorldClocks(dc, center, worldClockCount);
+            }
         }
+    }
 
-        // === RIGHT SIDE: World Clocks ===
+    // Simplified stats layout for MIP displays (Fenix 6S)
+    private function drawStatsMIP(dc, center) {
+        var clockTime = System.getClockTime();
+
+        // World clocks - CENTERED at bottom
         var worldClockCount = Settings.getWorldClockCount();
         if (worldClockCount > 0) {
-            drawWorldClocks(dc, center, worldClockCount);
+            var baseY = Theme.getWorldClocksY();
+            var localOffset = clockTime.timeZoneOffset / 3600;
+
+            if (worldClockCount >= 1) {
+                var tz1Name = Settings.getTimezone1Name();
+                var tz1Offset = Settings.getTimezone1Offset();
+                var tz1Hour = (clockTime.hour - localOffset + tz1Offset + 48) % 24;
+                var tz1Min = clockTime.min;
+                var tzY1 = worldClockCount >= 2 ? baseY - 12 : baseY;
+
+                var tz1Str = tz1Name + " " + tz1Hour.format("%02d") + ":" + tz1Min.format("%02d");
+                dc.setColor(Theme.getColor(Theme.TEXT_SECONDARY), Graphics.COLOR_TRANSPARENT);
+                dc.drawText(center, tzY1, Graphics.FONT_XTINY, tz1Str, Graphics.TEXT_JUSTIFY_CENTER);
+            }
+
+            if (worldClockCount >= 2) {
+                var tz2Name = Settings.getTimezone2Name();
+                var tz2Offset = Settings.getTimezone2Offset();
+                var tz2Hour = (clockTime.hour - localOffset + tz2Offset + 48) % 24;
+                var tz2Min = clockTime.min;
+                var tzY2 = baseY + 12;
+
+                var tz2Str = tz2Name + " " + tz2Hour.format("%02d") + ":" + tz2Min.format("%02d");
+                dc.setColor(Theme.getColor(Theme.TEXT_SECONDARY), Graphics.COLOR_TRANSPARENT);
+                dc.drawText(center, tzY2, Graphics.FONT_XTINY, tz2Str, Graphics.TEXT_JUSTIFY_CENTER);
+            }
         }
+
+        // HR + Battery row at very bottom
+        var statsY = Theme.getStatsRowY();
+        var currentHR = 0;
+
+        // Get Heart Rate
+        var activityInfo = Activity.getActivityInfo();
+        if (activityInfo != null && activityInfo.currentHeartRate != null) {
+            currentHR = activityInfo.currentHeartRate;
+        } else {
+            if (Toybox has :ActivityMonitor) {
+                var hrIterator = ActivityMonitor.getHeartRateHistory(1, true);
+                if (hrIterator != null) {
+                    var hrSample = hrIterator.next();
+                    if (hrSample != null && hrSample.heartRate != null && hrSample.heartRate != ActivityMonitor.INVALID_HR_SAMPLE) {
+                        currentHR = hrSample.heartRate;
+                    }
+                }
+            }
+        }
+
+        // Draw heart icon + HR on left side of center
+        var hrStr = currentHR > 0 ? currentHR.format("%d") : "--";
+        dc.setColor(Theme.getColor(Theme.HR_RING), Graphics.COLOR_TRANSPARENT);
+        drawHeartIconSmall(dc, center - 45, statsY - 3);
+        dc.drawText(center - 32, statsY, Graphics.FONT_XTINY, hrStr, Graphics.TEXT_JUSTIFY_LEFT);
+
+        // Battery on right side of center
+        var stats = System.getSystemStats();
+        var battery = stats.battery.toNumber();
+        var batteryColor = Theme.TEXT_DIM;
+        if (battery <= 20) {
+            batteryColor = 0xE57373;
+        } else if (battery <= 40) {
+            batteryColor = 0xFFB347;
+        }
+        dc.setColor(Theme.getColor(batteryColor), Graphics.COLOR_TRANSPARENT);
+        drawBatteryIconSmall(dc, center + 18, statsY - 4);
+        dc.drawText(center + 32, statsY, Graphics.FONT_XTINY, battery.format("%d") + "%", Graphics.TEXT_JUSTIFY_LEFT);
+    }
+
+    // Small heart icon for MIP stats row (5x4 pixels)
+    private function drawHeartIconSmall(dc, x, y) {
+        dc.fillRectangle(x, y, 2, 1);
+        dc.fillRectangle(x+3, y, 2, 1);
+        dc.fillRectangle(x, y+1, 5, 1);
+        dc.fillRectangle(x+1, y+2, 3, 1);
+        dc.fillRectangle(x+2, y+3, 1, 1);
+    }
+
+    // Small battery icon for MIP stats row (10x6 pixels)
+    private function drawBatteryIconSmall(dc, x, y) {
+        dc.drawRectangle(x, y, 8, 5);
+        dc.fillRectangle(x+8, y+1, 2, 3);
     }
 
     private function drawActivityRings(dc, center) {

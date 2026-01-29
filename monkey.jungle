@@ -13,5 +13,9 @@ base.resourcePath = resources
 # Fenix 8 47mm: 454x454
 fenix847mm.resourcePath = $(fenix847mm.resourcePath);resources-fenix8
 
+# Fenix 6S MIP: 240x240
+fenix6s.resourcePath = $(fenix6s.resourcePath);resources-fenix6s
+fenix6spro.resourcePath = $(fenix6spro.resourcePath);resources-fenix6s
+
 # Optimization settings
 base.excludeAnnotations = debug

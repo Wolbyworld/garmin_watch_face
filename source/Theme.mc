@@ -50,12 +50,55 @@ module Theme {
     var screenHeight = 454;
     var isInitialized = false;
 
+    // MIP display detection (Fenix 6S is 240x240, AMOLED are 390+)
+    var isMIPDisplay = false;
+
     function initLayout(dc) {
         if (!isInitialized) {
             screenWidth = dc.getWidth();
             screenHeight = dc.getHeight();
+            // MIP displays are 240x240 or 260x260, AMOLED are 390+ pixels
+            isMIPDisplay = (screenWidth < 300);
             isInitialized = true;
         }
+    }
+
+    // Map a 24-bit color to nearest MIP 64-color palette color
+    // MIP displays only support 6 levels per channel: 0x00, 0x55, 0xAA, 0xFF
+    function mapToMIPPalette(color) {
+        var r = (color >> 16) & 0xFF;
+        var g = (color >> 8) & 0xFF;
+        var b = color & 0xFF;
+
+        // Quantize each channel to nearest of: 0x00, 0x55, 0xAA, 0xFF
+        r = quantizeChannel(r);
+        g = quantizeChannel(g);
+        b = quantizeChannel(b);
+
+        return (r << 16) | (g << 8) | b;
+    }
+
+    // Quantize a single channel (0-255) to MIP palette level
+    function quantizeChannel(value) {
+        // Thresholds: 0-42 -> 0x00, 43-127 -> 0x55, 128-212 -> 0xAA, 213-255 -> 0xFF
+        if (value < 43) { return 0x00; }
+        if (value < 128) { return 0x55; }
+        if (value < 213) { return 0xAA; }
+        return 0xFF;
+    }
+
+    // Get a color, mapped to MIP palette if on MIP display
+    function getColor(color) {
+        if (isMIPDisplay) {
+            return mapToMIPPalette(color);
+        }
+        return color;
+    }
+
+    // Dim color for MIP - returns palette-safe dimmed color
+    function dimColorMIP(color, factor) {
+        var dimmed = dimColor(color, factor);
+        return mapToMIPPalette(dimmed);
     }
 
     // Apply theme based on settings
@@ -142,6 +185,25 @@ module Theme {
 
     function getRingStroke() {
         return (screenWidth * 0.013).toNumber(); // ~6px on 454
+    }
+
+    // MIP-specific layout helpers
+    function getWorldClocksY() {
+        if (isMIPDisplay) {
+            // Centered at bottom for MIP
+            return (screenHeight * 0.82).toNumber();
+        }
+        return getRingsY();  // Same as rings Y on AMOLED
+    }
+
+    function getStatsRowY() {
+        // Bottom row for HR + battery on MIP
+        return (screenHeight * 0.92).toNumber();
+    }
+
+    function getChartHeightMIP() {
+        // Smaller chart for MIP display
+        return (screenHeight * 0.17).toNumber();  // ~40px on 240
     }
 
     function getSkyColor(hour) {
