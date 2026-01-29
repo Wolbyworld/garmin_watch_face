@@ -88,7 +88,7 @@ The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face t
 - Custom mini-digit renderer (8x10 pixels) and mini-letter renderer (9x11 pixels) for tiny text
 - Day labels: 2-character abbreviations (MO, TU, WE, TH, FR, SA, SU) using custom mini-letters
 - Organic cloud shapes using overlapping circles
-- Activity rings with HR (+ heart icon) in center, steps below
+- Activity rings with Apple-style overflow effect and cycling center data
 - Two secondary timezones: São Paulo (UTC-3) and San Francisco (UTC-8)
 - **External Weather API (Open-Meteo)** ✅ Working on real device!
   - Fetches 4 days of data every 30 minutes via background service (UI shows 96h)
@@ -195,7 +195,7 @@ Note: We request 4 days even though UI shows 72h, to ensure full coverage regard
 
 **Solution**: Custom pixel-based renderers using `fillRectangle()`:
 - `drawMiniDigit()` - 8x10 pixel digits (0-9) for numbers
-- `drawMiniLetter()` - 9x11 pixel letters (M, T, W, F, S, U, O, H, R, A, E) for day labels
+- `drawMiniLetter()` - 9x11 pixel letters (M, T, W, F, S, U, O, H, R, A, E, -) for day labels and "--" placeholder
 - `drawMiniNumber()` - Wrapper for multi-digit numbers (supports negative)
 - `drawMiniText()` - Wrapper for multi-letter text, centered
 
@@ -250,7 +250,50 @@ The 454x454 display is circular, so elements near the edges get clipped. Key lea
    var tzY2 = ringsY + 10;          // Second row (lower)
    ```
 
-5. **Heart icon with HR**: Use compact 6x5 pixel heart icon. Position heart to left of HR number, adjust based on digit count (2 vs 3 digits for HR ≥100) to keep centered in ring.
+5. **Heart icon with HR**: HR number displays alone in ring center; heart icon appears in the icon column (below steps/stairs/body battery icons). Shows "--" when no HR data available.
+
+### Activity Rings Design
+
+**Ring Sizes** (optimized for 454px display):
+- Outer radius: 48px, Middle: 38px, Inner: 28px
+- Stroke width: 6px
+- Position: `center - 85` horizontally (moved left to avoid right edge clipping)
+
+**Apple-Style Overflow Effect** (when progress > 100%):
+The key insight is that Apple doesn't use arrows - just visual layering:
+```monkeyc
+// 1. Base ring at 50% brightness (shows it's "underneath")
+dc.setColor(Theme.dimColor(color, 0.5), Graphics.COLOR_TRANSPARENT);
+dc.drawArc(x, y, radius, Graphics.ARC_CLOCKWISE, 90, -270);
+
+// 2. Black shadow offset by 3px (creates depth/floating effect)
+dc.setColor(0x000000, Graphics.COLOR_TRANSPARENT);
+dc.drawArc(x + 3, y + 3, radius, ...);
+
+// 3. Bright overflow arc at 125% brightness (clearly "on top")
+dc.setColor(Theme.brightenColor(color, 1.25), Graphics.COLOR_TRANSPARENT);
+dc.drawArc(x, y, radius, Graphics.ARC_CLOCKWISE, 90, 90 - overflowDeg);
+
+// 4. Rounded end caps (slightly larger at tip to emphasize "head")
+dc.fillCircle(tipX, tipY, (stroke / 2) + 1);
+```
+
+**Cycling Center Data** (rotates every 5 seconds):
+```monkeyc
+var cycleIndex = (clockTime.sec / 5) % 4;
+// 0=Steps (teal), 1=HR (red), 2=Floors (yellow), 3=Body Battery (blue)
+```
+- Each value displays in its matching ring color
+- 4 small indicator dots below show which metric is active (bright dot = current)
+
+**Theme.brightenColor()** - Added to Theme.mc for overflow effect:
+```monkeyc
+function brightenColor(color, factor) {
+    var r = ((color >> 16) & 0xFF) * factor;
+    // ... clamp to 255 max
+    return (r.toNumber() << 16) | (g.toNumber() << 8) | b.toNumber();
+}
+```
 
 ### Project Structure (Simplified)
 ```
@@ -287,7 +330,8 @@ garmin_watch_face/
 - ~~GPS-based location~~ ✅ Done (uses last GPS position from activities)
 - ~~Test external weather API on real device~~ ✅ Working!
 - ~~Implement settings screen~~ ✅ Done (22 settings across 6 categories)
-- **HR not showing in ring center** - `centerData` default was invalid (3), changed to 1 but still not rendering. Investigate `WatchFaceView.mc` center data rendering logic.
+- ~~HR not showing in ring center~~ ✅ Fixed - added bounds validation for `centerData` setting, HR number in center with heart icon in icon column
+- ~~Activity rings too small~~ ✅ Fixed - larger rings (48/38/28), Apple-style overflow effect, cycling center data every 5 seconds
 
 ### Settings System
 
@@ -318,8 +362,8 @@ garmin_watch_face/
    - Outer ring data (Steps/Floors/Body Battery/HR/Off)
    - Middle ring data
    - Inner ring data
-   - Center data (Steps/HR/Off)
    - Show ring icons (on/off)
+   - Note: Center data now auto-cycles through all 4 metrics every 5 seconds
 
 5. **Appearance**:
    - Theme (Dark/Warm/Cool/High Contrast)

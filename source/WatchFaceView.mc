@@ -17,9 +17,9 @@ class WatchFaceView extends WatchUi.WatchFace {
     // SIMULATOR DEBUG MODE: Set to true for testing in simulator, false for release
     // The Garmin simulator does NOT populate ActivityMonitor data from simulation-data.json
     private const DEBUG_SIMULATOR = false;
-    private const DEBUG_STEPS = 2108;
+    private const DEBUG_STEPS = 9500;      // 135% of goal - shows overflow
     private const DEBUG_STEP_GOAL = 7000;
-    private const DEBUG_FLOORS = 3;
+    private const DEBUG_FLOORS = 14;       // 140% of goal - shows overflow
     private const DEBUG_FLOOR_GOAL = 10;
     private const DEBUG_BODY_BATTERY = 72;
     private const DEBUG_HR = 68;
@@ -555,17 +555,17 @@ class WatchFaceView extends WatchUi.WatchFace {
     }
 
     private function drawActivityRings(dc, center) {
-        var ringsX = center - 70;
+        var ringsX = center - 85;
         var ringsY = 370;
-        var stroke = 4;
-        var outerR = 34;
-        var middleR = 26;
-        var innerR = 18;
+        var stroke = 6;
+        var outerR = 48;
+        var middleR = 38;
+        var innerR = 28;
 
         var ringLayout = Settings.getRingLayout();
 
-        // Get all activity data
-        var activityData = getActivityData();
+        // Get all activity data (without capping at 1.0 for overflow display)
+        var activityData = getActivityDataRaw();
         var currentSteps = activityData[:steps];
         var stepsProgress = activityData[:stepsProgress];
         var currentFloors = activityData[:floors];
@@ -583,25 +583,25 @@ class WatchFaceView extends WatchUi.WatchFace {
         // Draw outer ring
         if (outerType != 4) {
             var outerData = getRingData(outerType, stepsProgress, floorsProgress, bodyBatteryProgress, hrProgress);
-            drawRing(dc, ringsX, ringsY, outerR, stroke, outerData[:progress], Theme.getRingColor(outerType));
+            drawRingWithOverflow(dc, ringsX, ringsY, outerR, stroke, outerData[:progress], Theme.getRingColor(outerType));
         }
 
         // Draw middle ring (only if layout is "All 3")
         if (ringLayout == 0 && middleType != 4) {
             var middleData = getRingData(middleType, stepsProgress, floorsProgress, bodyBatteryProgress, hrProgress);
-            drawRing(dc, ringsX, ringsY, middleR, stroke, middleData[:progress], Theme.getRingColor(middleType));
+            drawRingWithOverflow(dc, ringsX, ringsY, middleR, stroke, middleData[:progress], Theme.getRingColor(middleType));
         }
 
         // Draw inner ring (only if layout is "All 3")
         if (ringLayout == 0 && innerType != 4) {
             var innerData = getRingData(innerType, stepsProgress, floorsProgress, bodyBatteryProgress, hrProgress);
-            drawRing(dc, ringsX, ringsY, innerR, stroke, innerData[:progress], Theme.getRingColor(innerType));
+            drawRingWithOverflow(dc, ringsX, ringsY, innerR, stroke, innerData[:progress], Theme.getRingColor(innerType));
         }
 
         // Icons to the right of rings
         if (Settings.isShowRingIcons()) {
-            var iconX = ringsX + outerR + 10;
-            var iconSpacing = 18;
+            var iconX = ringsX + outerR + 12;
+            var iconSpacing = 20;
 
             if (outerType != 4) {
                 drawRingIcon(dc, iconX, ringsY - iconSpacing - 5, outerType);
@@ -614,26 +614,148 @@ class WatchFaceView extends WatchUi.WatchFace {
             }
         }
 
-        // Center data
-        var centerType = Settings.getCenterData();
-        if (centerType != 2) {  // Not "Off"
-            if (centerType == 0) {
-                // Steps
-                drawMiniNumber(dc, ringsX, ringsY, currentSteps, Theme.STEPS_RING);
-            } else if (centerType == 1) {
-                // HR with heart icon
-                var hrDigits = currentHR >= 100 ? 3 : 2;
-                var hrTotalWidth = (hrDigits * 9) + 8;
-                var hrStartX = ringsX - (hrTotalWidth / 2);
-                drawHeartIcon(dc, hrStartX, ringsY - 2, Theme.HR_RING);
-                drawMiniNumber(dc, ringsX + 5, ringsY, currentHR, Theme.HR_RING);
+        // Cycling center data - rotates every 5 seconds through all 4 metrics
+        var clockTime = System.getClockTime();
+        var cycleIndex = (clockTime.sec / 5) % 4;  // 0=Steps, 1=HR, 2=Floors, 3=BodyBattery
+
+        var centerValue = 0;
+        var centerColor = Theme.STEPS_RING;
+        var showDash = false;
+
+        if (cycleIndex == 0) {
+            // Steps
+            centerValue = currentSteps;
+            centerColor = Theme.STEPS_RING;
+        } else if (cycleIndex == 1) {
+            // Heart Rate
+            centerValue = currentHR;
+            centerColor = Theme.HR_RING;
+            if (currentHR <= 0) { showDash = true; }
+        } else if (cycleIndex == 2) {
+            // Floors
+            centerValue = currentFloors;
+            centerColor = Theme.FLOORS_RING;
+        } else {
+            // Body Battery
+            centerValue = bodyBattery;
+            centerColor = Theme.BODY_BATTERY_RING;
+        }
+
+        if (showDash) {
+            drawMiniText(dc, ringsX, ringsY, "--", centerColor);
+        } else {
+            drawMiniNumber(dc, ringsX, ringsY, centerValue, centerColor);
+        }
+
+        // Small indicator dot below center showing which metric is displayed
+        drawCycleIndicator(dc, ringsX, ringsY + 18, cycleIndex);
+    }
+
+    // Draw 4 small dots indicating which metric is currently shown
+    private function drawCycleIndicator(dc, centerX, y, activeIndex) {
+        var dotSpacing = 8;
+        var startX = centerX - (dotSpacing * 1.5).toNumber();
+        var colors = [Theme.STEPS_RING, Theme.HR_RING, Theme.FLOORS_RING, Theme.BODY_BATTERY_RING];
+
+        for (var i = 0; i < 4; i++) {
+            var dotX = startX + (i * dotSpacing);
+            if (i == activeIndex) {
+                dc.setColor(colors[i], Graphics.COLOR_TRANSPARENT);
+                dc.fillCircle(dotX, y, 3);
+            } else {
+                dc.setColor(Theme.dimColor(colors[i], 0.3), Graphics.COLOR_TRANSPARENT);
+                dc.fillCircle(dotX, y, 2);
+            }
+        }
+    }
+
+    // Get activity data without capping progress at 1.0 (for overflow display)
+    private function getActivityDataRaw() {
+        var currentSteps = 0;
+        var stepsProgress = 0.0;
+        var currentFloors = 0;
+        var floorsProgress = 0.0;
+        var bodyBattery = 0;
+        var bodyBatteryProgress = 0.0;
+        var currentHR = 0;
+        var hrProgress = 0.0;
+
+        if (DEBUG_SIMULATOR) {
+            currentSteps = DEBUG_STEPS;
+            stepsProgress = DEBUG_STEPS.toFloat() / DEBUG_STEP_GOAL.toFloat();
+            // Don't cap - allow overflow
+
+            currentFloors = DEBUG_FLOORS;
+            floorsProgress = DEBUG_FLOORS.toFloat() / DEBUG_FLOOR_GOAL.toFloat();
+            // Don't cap - allow overflow
+
+            bodyBattery = DEBUG_BODY_BATTERY;
+            bodyBatteryProgress = bodyBattery / 100.0;
+
+            currentHR = DEBUG_HR;
+            hrProgress = (currentHR - 40).toFloat() / 160.0;
+            if (hrProgress < 0.0) { hrProgress = 0.0; }
+        } else {
+            // Get Heart Rate
+            var activityInfo = Activity.getActivityInfo();
+            if (activityInfo != null && activityInfo.currentHeartRate != null) {
+                currentHR = activityInfo.currentHeartRate;
+            } else {
+                var hrIterator = ActivityMonitor.getHeartRateHistory(1, true);
+                if (hrIterator != null) {
+                    var hrSample = hrIterator.next();
+                    if (hrSample != null && hrSample.heartRate != null && hrSample.heartRate != ActivityMonitor.INVALID_HR_SAMPLE) {
+                        currentHR = hrSample.heartRate;
+                    }
+                }
+            }
+            hrProgress = (currentHR - 40).toFloat() / 160.0;
+            if (hrProgress < 0.0) { hrProgress = 0.0; }
+
+            // Get Body Battery
+            if (Toybox has :SensorHistory && SensorHistory has :getBodyBatteryHistory) {
+                var bbIterator = SensorHistory.getBodyBatteryHistory({:period => 1, :order => SensorHistory.ORDER_NEWEST_FIRST});
+                if (bbIterator != null) {
+                    var bbSample = bbIterator.next();
+                    if (bbSample != null && bbSample.data != null) {
+                        bodyBattery = bbSample.data.toNumber();
+                        bodyBatteryProgress = bodyBattery / 100.0;
+                    }
+                }
+            }
+
+            var actInfo = ActivityMonitor.getInfo();
+            if (actInfo != null) {
+                if (actInfo.steps != null) {
+                    currentSteps = actInfo.steps;
+                }
+                if (actInfo.stepGoal != null && actInfo.stepGoal > 0) {
+                    stepsProgress = currentSteps.toFloat() / actInfo.stepGoal.toFloat();
+                    // Don't cap - allow overflow
+                }
+
+                if (actInfo.floorsClimbed != null) {
+                    currentFloors = actInfo.floorsClimbed;
+                }
+                var floorGoal = 10;
+                if (actInfo.floorsClimbedGoal != null && actInfo.floorsClimbedGoal > 0) {
+                    floorGoal = actInfo.floorsClimbedGoal;
+                }
+                floorsProgress = currentFloors.toFloat() / floorGoal.toFloat();
+                // Don't cap - allow overflow
             }
         }
 
-        // Steps count below rings (if center shows HR or is off)
-        if (centerType != 0) {
-            drawMiniNumber(dc, ringsX, ringsY + outerR + 14, currentSteps, Theme.STEPS_RING);
-        }
+        return {
+            :steps => currentSteps,
+            :stepsProgress => stepsProgress,
+            :floors => currentFloors,
+            :floorsProgress => floorsProgress,
+            :bodyBattery => bodyBattery,
+            :bodyBatteryProgress => bodyBatteryProgress,
+            :hr => currentHR,
+            :hrProgress => hrProgress
+        };
     }
 
     private function getActivityData() {
@@ -927,6 +1049,8 @@ class WatchFaceView extends WatchUi.WatchFace {
             dc.fillRectangle(x, y+1, 1, 9);
             dc.fillRectangle(x+1, y+5, 5, 1);
             dc.fillRectangle(x, y+10, 9, 1);
+        } else if (letter.equals("-")) {
+            dc.fillRectangle(x+2, y+5, 5, 1);  // Horizontal dash centered vertically
         }
     }
 
@@ -979,6 +1103,78 @@ class WatchFaceView extends WatchUi.WatchFace {
         dc.fillRectangle(x, y+2, 6, 1);
         dc.fillRectangle(x+1, y+3, 4, 1);
         dc.fillRectangle(x+2, y+4, 2, 1);
+    }
+
+    // Draw ring with Apple-style overflow indicator when progress > 100%
+    private function drawRingWithOverflow(dc, x, y, radius, stroke, progress, color) {
+        dc.setPenWidth(stroke);
+
+        // Background ring (very dim)
+        dc.setColor(Theme.dimColor(color, 0.15), Graphics.COLOR_TRANSPARENT);
+        dc.drawArc(x, y, radius, Graphics.ARC_CLOCKWISE, 90, -270);
+
+        if (progress <= 0.01) {
+            dc.setPenWidth(1);
+            return;
+        }
+
+        if (progress <= 1.0) {
+            // Normal progress: draw the arc with rounded caps
+            var sweepDeg = (progress * 360).toNumber();
+            dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+            dc.drawArc(x, y, radius, Graphics.ARC_CLOCKWISE, 90, 90 - sweepDeg);
+
+            // Rounded start cap at 12 o'clock
+            var startX = x;
+            var startY = y - radius;
+            dc.fillCircle(startX, startY, stroke / 2);
+
+            // Rounded end cap at the tip
+            var tipAngle = (90 - sweepDeg) * Math.PI / 180.0;
+            var tipX = x + (radius * Math.cos(tipAngle)).toNumber();
+            var tipY = y - (radius * Math.sin(tipAngle)).toNumber();
+            dc.fillCircle(tipX, tipY, stroke / 2);
+        } else {
+            // OVERFLOW - Apple-style pure layering (no arrows)
+
+            // 1. Base ring: completed 100%, dimmed to show it's "underneath"
+            dc.setColor(Theme.dimColor(color, 0.5), Graphics.COLOR_TRANSPARENT);
+            dc.drawArc(x, y, radius, Graphics.ARC_CLOCKWISE, 90, -270);
+
+            // 2. Calculate overflow (capped at 100% extra for visual)
+            var overflow = progress - 1.0;
+            if (overflow > 1.0) { overflow = 1.0; }
+            var overflowDeg = (overflow * 360).toNumber();
+            if (overflowDeg < 8) { overflowDeg = 8; }
+
+            // 3. Shadow layer - offset down-right, creates floating effect
+            dc.setPenWidth(stroke);
+            dc.setColor(0x000000, Graphics.COLOR_TRANSPARENT);
+            dc.drawArc(x + 3, y + 3, radius, Graphics.ARC_CLOCKWISE, 90, 90 - overflowDeg);
+            // Shadow end cap
+            var shadowTipAngle = (90 - overflowDeg) * Math.PI / 180.0;
+            var shadowTipX = (x + 3) + (radius * Math.cos(shadowTipAngle)).toNumber();
+            var shadowTipY = (y + 3) - (radius * Math.sin(shadowTipAngle)).toNumber();
+            dc.fillCircle(shadowTipX, shadowTipY, stroke / 2);
+            // Shadow start cap
+            dc.fillCircle(x + 3, y + 3 - radius, stroke / 2);
+
+            // 4. Bright overflow arc - full brightness, "on top"
+            var overflowColor = Theme.brightenColor(color, 1.25);
+            dc.setColor(overflowColor, Graphics.COLOR_TRANSPARENT);
+            dc.drawArc(x, y, radius, Graphics.ARC_CLOCKWISE, 90, 90 - overflowDeg);
+
+            // 5. Rounded start cap at 12 o'clock
+            dc.fillCircle(x, y - radius, stroke / 2);
+
+            // 6. Rounded end cap - slightly larger to emphasize the "head"
+            var tipAngle = (90 - overflowDeg) * Math.PI / 180.0;
+            var tipX = x + (radius * Math.cos(tipAngle)).toNumber();
+            var tipY = y - (radius * Math.sin(tipAngle)).toNumber();
+            dc.fillCircle(tipX, tipY, (stroke / 2) + 1);
+        }
+
+        dc.setPenWidth(1);
     }
 
     private function drawRing(dc, x, y, radius, stroke, progress, color) {

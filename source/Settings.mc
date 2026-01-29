@@ -78,6 +78,9 @@ module Settings {
         _middleRing = getNumberProperty(app, "middleRing", 1);
         _innerRing = getNumberProperty(app, "innerRing", 2);
         _centerData = getNumberProperty(app, "centerData", 1);
+        if (_centerData < 0 || _centerData > 2) {
+            _centerData = 1;  // Default to HR if invalid
+        }
         _showRingIcons = getBoolProperty(app, "showRingIcons", true);
 
         // Appearance

@@ -173,6 +173,17 @@ module Theme {
         return (r.toNumber() << 16) | (g.toNumber() << 8) | b.toNumber();
     }
 
+    // Brighten a color (factor > 1.0 makes it brighter, capped at 255)
+    function brightenColor(color, factor) {
+        var r = ((color >> 16) & 0xFF) * factor;
+        var g = ((color >> 8) & 0xFF) * factor;
+        var b = (color & 0xFF) * factor;
+        if (r > 255) { r = 255; }
+        if (g > 255) { g = 255; }
+        if (b > 255) { b = 255; }
+        return (r.toNumber() << 16) | (g.toNumber() << 8) | b.toNumber();
+    }
+
     // Get ring color for a data type
     // dataType: 0=Steps, 1=Floors, 2=BodyBatt, 3=HR
     function getRingColor(dataType) {
