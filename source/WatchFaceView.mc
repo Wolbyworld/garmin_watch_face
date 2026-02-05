@@ -17,12 +17,12 @@ class WatchFaceView extends WatchUi.WatchFace {
     // SIMULATOR DEBUG MODE: Set to true for testing in simulator, false for release
     // The Garmin simulator does NOT populate ActivityMonitor data from simulation-data.json
     private const DEBUG_SIMULATOR = false;
-    private const DEBUG_STEPS = 9500;      // 135% of goal - shows overflow
-    private const DEBUG_STEP_GOAL = 7000;
-    private const DEBUG_FLOORS = 14;       // 140% of goal - shows overflow
+    private const DEBUG_STEPS = 6700;      // 67% of goal
+    private const DEBUG_STEP_GOAL = 10000;
+    private const DEBUG_FLOORS = 8;        // 80% of goal
     private const DEBUG_FLOOR_GOAL = 10;
-    private const DEBUG_BODY_BATTERY = 72;
-    private const DEBUG_HR = 68;
+    private const DEBUG_BODY_BATTERY = 54;
+    private const DEBUG_HR = 82;
 
     function initialize() {
         WatchFace.initialize();
@@ -124,7 +124,6 @@ class WatchFaceView extends WatchUi.WatchFace {
     }
 
     private function drawHeader(dc) {
-        // Header - centered single column: temp on top, city below
         var center = Theme.getCenter();
 
         // Use cached data from WeatherDataManager
@@ -133,26 +132,65 @@ class WatchFaceView extends WatchUi.WatchFace {
             ? Settings.getDisplayTemp(temp).format("%d") + "°"
             : "18°";
         var locationStr = WeatherDataManager.locationName;
+        var condition = WeatherDataManager.currentCondition;
 
         // Check if using default location (no GPS data)
         var usingDefault = Application.Storage.getValue("using_default_location");
 
-        // Scale Y positions for MIP
-        var tempY = Theme.isMIPDisplay ? 5 : 7;
-        var cityY = Theme.isMIPDisplay ? 22 : 30;
+        // Check if location is a real place name (not a condition text fallback)
+        var hasRealLocation = !locationStr.equals("Unknown") && !locationStr.equals("No Weather");
+        // If location matches a condition text, it's a fallback - don't show separator
+        if (locationStr.equals("Clear") || locationStr.equals("Pt Cloudy") ||
+            locationStr.equals("Cloudy") || locationStr.equals("Rain") ||
+            locationStr.equals("Lt Rain") || locationStr.equals("Hvy Rain") ||
+            locationStr.equals("Snow") || locationStr.equals("Lt Snow") ||
+            locationStr.equals("Hvy Snow") || locationStr.equals("Storms") ||
+            locationStr.equals("Fog") || locationStr.equals("Hazy") ||
+            locationStr.equals("Windy") || locationStr.equals("Weather")) {
+            hasRealLocation = false;
+        }
 
-        // Temperature on line 1 (centered, brighter)
-        dc.setColor(Theme.getColor(Theme.TIME_PRIMARY), Graphics.COLOR_TRANSPARENT);
-        dc.drawText(center, tempY, Graphics.FONT_XTINY, tempStr, Graphics.TEXT_JUSTIFY_CENTER);
+        if (Theme.isMIPDisplay) {
+            // MIP: no icon, single line "15° · Location" at Y=12
+            var headerY = 12;
+            var headerStr = tempStr;
+            if (hasRealLocation) {
+                headerStr = tempStr + " · " + locationStr;
+            }
+            dc.setColor(Theme.getColor(Theme.TIME_PRIMARY), Graphics.COLOR_TRANSPARENT);
+            dc.drawText(center, headerY, Graphics.FONT_XTINY, headerStr, Graphics.TEXT_JUSTIFY_CENTER);
+        } else {
+            // AMOLED: [icon] 15° · Pozuelo at Y=14
+            var headerY = 14;
+            var headerStr;
+            if (hasRealLocation) {
+                headerStr = tempStr + " · " + locationStr;
+            } else {
+                headerStr = tempStr;
+            }
 
-        // City on line 2 (centered, dimmer)
-        dc.setColor(Theme.getColor(Theme.TEXT_SECONDARY), Graphics.COLOR_TRANSPARENT);
-        dc.drawText(center, cityY, Graphics.FONT_XTINY, locationStr, Graphics.TEXT_JUSTIFY_CENTER);
+            // Calculate total width for centering with icon
+            var textWidth = dc.getTextWidthInPixels(headerStr, Graphics.FONT_XTINY);
+            var iconWidth = 16;
+            var iconGap = 4;
+            var totalWidth = iconWidth + iconGap + textWidth;
+            var startX = center - (totalWidth / 2);
 
-        // Show red warning cloud if using default location
-        if (usingDefault == true) {
-            var cloudX = Theme.isMIPDisplay ? center + 40 : center + 55;
-            drawWarningCloud(dc, cloudX, cityY);
+            // Draw weather icon — vertically centered with text
+            var textH = dc.getFontHeight(Graphics.FONT_XTINY);
+            var iconH = 12;
+            var iconY = headerY + (textH - iconH) / 2;
+            drawWeatherIcon(dc, startX, iconY, condition);
+
+            // Draw text
+            dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(startX + iconWidth + iconGap, headerY, Graphics.FONT_XTINY, headerStr, Graphics.TEXT_JUSTIFY_LEFT);
+
+            // Show red warning cloud if using default location
+            if (usingDefault == true) {
+                var warningX = startX + totalWidth + 8;
+                drawWarningCloud(dc, warningX, headerY + 4);
+            }
         }
     }
 
@@ -168,12 +206,145 @@ class WatchFaceView extends WatchUi.WatchFace {
         dc.fillCircle(x + 2, y - 2, 2); // top-right
     }
 
+    // Draw weather icon based on condition code (~14x12 pixel art)
+    private function drawWeatherIcon(dc, x, y, condition) {
+        if (condition == null) {
+            drawIconCloud(dc, x, y);
+            return;
+        }
+        if (condition == Weather.CONDITION_CLEAR) {
+            drawIconSun(dc, x, y);
+        } else if (condition == Weather.CONDITION_PARTLY_CLOUDY) {
+            drawIconPartlyCloudy(dc, x, y);
+        } else if (condition == Weather.CONDITION_MOSTLY_CLOUDY || condition == Weather.CONDITION_CLOUDY) {
+            drawIconCloud(dc, x, y);
+        } else if (condition == Weather.CONDITION_RAIN || condition == Weather.CONDITION_LIGHT_RAIN) {
+            drawIconRain(dc, x, y);
+        } else if (condition == Weather.CONDITION_HEAVY_RAIN) {
+            drawIconHeavyRain(dc, x, y);
+        } else if (condition == Weather.CONDITION_SNOW || condition == Weather.CONDITION_LIGHT_SNOW || condition == Weather.CONDITION_HEAVY_SNOW) {
+            drawIconSnow(dc, x, y);
+        } else if (condition == Weather.CONDITION_THUNDERSTORMS) {
+            drawIconThunder(dc, x, y);
+        } else if (condition == Weather.CONDITION_FOG || condition == Weather.CONDITION_HAZY) {
+            drawIconFog(dc, x, y);
+        } else if (condition == Weather.CONDITION_WINDY) {
+            drawIconWind(dc, x, y);
+        } else {
+            drawIconCloud(dc, x, y);
+        }
+    }
+
+    // Sun icon: circle with rays
+    private function drawIconSun(dc, x, y) {
+        var cx = x + 7;
+        var cy = y + 5;
+        dc.setColor(Theme.TEMP_CURVE, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(cx, cy, 4);
+        // Rays
+        dc.fillRectangle(cx - 1, cy - 7, 2, 2);  // top
+        dc.fillRectangle(cx - 1, cy + 5, 2, 2);   // bottom
+        dc.fillRectangle(cx - 7, cy - 1, 2, 2);   // left
+        dc.fillRectangle(cx + 5, cy - 1, 2, 2);   // right
+    }
+
+    // Partly cloudy: small sun + cloud overlay
+    private function drawIconPartlyCloudy(dc, x, y) {
+        // Sun peeking from behind
+        dc.setColor(Theme.TEMP_CURVE, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(x + 10, y + 2, 3);
+        // Cloud in front
+        dc.setColor(0xB0B0B0, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(x + 4, y + 7, 3);
+        dc.fillCircle(x + 8, y + 6, 4);
+        dc.fillCircle(x + 12, y + 7, 3);
+    }
+
+    // Cloud icon
+    private function drawIconCloud(dc, x, y) {
+        dc.setColor(0x909090, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(x + 4, y + 7, 3);
+        dc.fillCircle(x + 8, y + 5, 4);
+        dc.fillCircle(x + 12, y + 7, 3);
+    }
+
+    // Rain icon: cloud + drops
+    private function drawIconRain(dc, x, y) {
+        dc.setColor(0x808080, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(x + 4, y + 4, 3);
+        dc.fillCircle(x + 8, y + 3, 4);
+        dc.fillCircle(x + 12, y + 4, 3);
+        // Rain drops
+        dc.setColor(Theme.PRECIPITATION, Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(x + 5, y + 9, 1, 3);
+        dc.fillRectangle(x + 9, y + 9, 1, 3);
+    }
+
+    // Heavy rain icon: cloud + more drops
+    private function drawIconHeavyRain(dc, x, y) {
+        dc.setColor(0x707070, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(x + 4, y + 4, 3);
+        dc.fillCircle(x + 8, y + 3, 4);
+        dc.fillCircle(x + 12, y + 4, 3);
+        // Heavy rain drops
+        dc.setColor(Theme.PRECIPITATION, Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(x + 4, y + 9, 1, 3);
+        dc.fillRectangle(x + 7, y + 9, 1, 3);
+        dc.fillRectangle(x + 10, y + 9, 1, 3);
+    }
+
+    // Snow icon: cloud + snowflakes (dots)
+    private function drawIconSnow(dc, x, y) {
+        dc.setColor(0x808080, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(x + 4, y + 4, 3);
+        dc.fillCircle(x + 8, y + 3, 4);
+        dc.fillCircle(x + 12, y + 4, 3);
+        // Snowflakes
+        dc.setColor(0xFFFFFF, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(x + 5, y + 10, 1);
+        dc.fillCircle(x + 9, y + 10, 1);
+        dc.fillCircle(x + 7, y + 12, 1);
+    }
+
+    // Thunder icon: cloud + bolt
+    private function drawIconThunder(dc, x, y) {
+        dc.setColor(0x606060, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(x + 4, y + 4, 3);
+        dc.fillCircle(x + 8, y + 3, 4);
+        dc.fillCircle(x + 12, y + 4, 3);
+        // Lightning bolt
+        dc.setColor(Theme.TEMP_CURVE, Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(x + 8, y + 8, 2, 2);
+        dc.fillRectangle(x + 7, y + 10, 2, 2);
+        dc.fillRectangle(x + 9, y + 10, 1, 1);
+    }
+
+    // Fog icon: horizontal lines
+    private function drawIconFog(dc, x, y) {
+        dc.setColor(0x808080, Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(x + 2, y + 2, 10, 1);
+        dc.fillRectangle(x + 1, y + 5, 12, 1);
+        dc.fillRectangle(x + 3, y + 8, 8, 1);
+        dc.fillRectangle(x + 1, y + 11, 10, 1);
+    }
+
+    // Wind icon: wavy lines
+    private function drawIconWind(dc, x, y) {
+        dc.setColor(0x909090, Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(x + 1, y + 3, 10, 1);
+        dc.fillRectangle(x + 11, y + 2, 2, 1);
+        dc.fillRectangle(x + 2, y + 6, 8, 1);
+        dc.fillRectangle(x + 10, y + 5, 2, 1);
+        dc.fillRectangle(x + 1, y + 9, 10, 1);
+        dc.fillRectangle(x + 11, y + 8, 2, 1);
+    }
+
     private function drawWeatherChart(dc) {
         // Chart dimensions - scale for MIP displays
         var chartX = Theme.isMIPDisplay ? 20 : 45;
-        var chartY = Theme.isMIPDisplay ? 50 : 70;
+        var chartY = Theme.isMIPDisplay ? 50 : 34;
         var chartWidth = Theme.screenWidth - (Theme.isMIPDisplay ? 40 : 90);
-        var chartHeight = Theme.isMIPDisplay ? Theme.getChartHeightMIP() : 80;
+        var chartHeight = Theme.isMIPDisplay ? Theme.getChartHeightMIP() : 115;
 
         var now = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
         var currentHour = now.hour;
@@ -445,7 +616,7 @@ class WatchFaceView extends WatchUi.WatchFace {
     }
 
     private function drawDate(dc) {
-        var y = Theme.isMIPDisplay ? (Theme.screenHeight * 0.40).toNumber() : 172;
+        var y = Theme.isMIPDisplay ? (Theme.screenHeight * 0.40).toNumber() : 166;
         var center = Theme.getCenter();
         var now = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
 
@@ -504,7 +675,7 @@ class WatchFaceView extends WatchUi.WatchFace {
     private function drawTime(dc) {
         var clockTime = System.getClockTime();
         var center = Theme.getCenter();
-        var baseY = Theme.isMIPDisplay ? (Theme.screenHeight * 0.56).toNumber() : 268;
+        var baseY = Theme.isMIPDisplay ? (Theme.screenHeight * 0.56).toNumber() : 255;
 
         var hour = clockTime.hour;
         var min = clockTime.min;
@@ -526,41 +697,59 @@ class WatchFaceView extends WatchUi.WatchFace {
         // Cap at 1.0 for visual fill (we don't show overflow in time digits)
         if (stepProgress > 1.0) { stepProgress = 1.0; }
 
-        // Use smaller font on MIP displays - NUMBER_HOT may not exist on all devices
-        var timeFont = Theme.isMIPDisplay ? Graphics.FONT_NUMBER_MEDIUM : Graphics.FONT_NUMBER_HOT;
+        // Font selection based on display type and user setting
+        var timeFont;
+        if (Theme.isMIPDisplay) {
+            timeFont = Graphics.FONT_NUMBER_MEDIUM;
+        } else {
+            var fontSetting = Settings.getTimeFont();
+            if (fontSetting == 1) { timeFont = Graphics.FONT_NUMBER_MEDIUM; }
+            else if (fontSetting == 2) { timeFont = Graphics.FONT_NUMBER_MILD; }
+            else { timeFont = Graphics.FONT_NUMBER_HOT; }
+        }
         var fontHeight = dc.getFontHeight(timeFont);
 
         var textTop = baseY - (fontHeight / 2);
         var textBottom = baseY + (fontHeight / 2);
-        var fillPixels = (fontHeight * stepProgress).toNumber();
-        var fillY = textBottom - fillPixels;
 
-        if (fontHeight > fillPixels) {
-            dc.setClip(0, textTop, Theme.screenWidth, fontHeight - fillPixels);
+        // Fill grows from bottom of text cell upward using full fontHeight
+        var fillHeight = (fontHeight * stepProgress).toNumber();
+        var fillY = textBottom - fillHeight;
+
+        // Unfilled portion (above fill line)
+        if (fillY > textTop) {
+            dc.setClip(0, textTop, Theme.screenWidth, fillY - textTop);
             dc.setColor(Theme.TIME_UNFILLED, Graphics.COLOR_TRANSPARENT);
             dc.drawText(center, baseY, timeFont, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.clearClip();
         }
 
-        if (fillPixels > 0) {
-            dc.setClip(0, fillY, Theme.screenWidth, fillPixels);
+        // Filled portion (fill line to bottom)
+        if (fillHeight > 0) {
+            dc.setClip(0, fillY, Theme.screenWidth, fillHeight);
             dc.setColor(Theme.TIME_FILL, Graphics.COLOR_TRANSPARENT);
             dc.drawText(center, baseY, timeFont, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.clearClip();
         }
 
-        // Seconds and AM/PM - only show if enabled in settings
-        var timeWidth = dc.getTextWidthInPixels(timeStr, timeFont);
-        var rightX = center + (timeWidth / 2) + 8;
-
-        if (Settings.isShowSeconds()) {
+        // Seconds and AM/PM — bottom-aligned to the right of the time digits
+        var showSec = Settings.isShowSeconds();
+        if (showSec || !is24h) {
+            var subText = "";
+            if (showSec) { subText = ":" + clockTime.sec.format("%02d"); }
+            if (!is24h) {
+                if (subText.length() > 0) { subText = subText + " "; }
+                subText = subText + (isPM ? "PM" : "AM");
+            }
+            var subFont = Graphics.FONT_XTINY;
+            var timeWidth = dc.getTextWidthInPixels(timeStr, timeFont);
+            var rightX = center + (timeWidth / 2) + 4;
+            // Exact baseline alignment using font ascent metrics
+            var timeBaseline = baseY - (fontHeight / 2) + dc.getFontAscent(timeFont);
+            var subBaseline = dc.getFontAscent(subFont);
+            var subY = timeBaseline - subBaseline;
             dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(rightX, baseY - 24, Graphics.FONT_TINY, clockTime.sec.format("%02d"), Graphics.TEXT_JUSTIFY_LEFT);
-        }
-
-        if (!is24h) {
-            dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(rightX, baseY + 16, Graphics.FONT_XTINY, isPM ? "PM" : "AM", Graphics.TEXT_JUSTIFY_LEFT);
+            dc.drawText(rightX, subY, subFont, subText, Graphics.TEXT_JUSTIFY_LEFT);
         }
     }
 

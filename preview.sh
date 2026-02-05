@@ -6,11 +6,9 @@
 DEVICE="${1:-fenix847mm}"
 SDK_PATH="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-8.4.0-2025-12-03-5122605dc"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
 SCREENSHOTS_DIR="$PROJECT_DIR/screenshots"
 mkdir -p "$SCREENSHOTS_DIR"
-OUTPUT="$SCREENSHOTS_DIR/${DEVICE}-${TIMESTAMP}.png"
-LATEST="$SCREENSHOTS_DIR/latest.png"
+OUTPUT="$SCREENSHOTS_DIR/latest.png"
 PRG="/tmp/watchface-preview-${DEVICE}.prg"
 
 # Build
@@ -30,15 +28,18 @@ MONKEYDO_PID=$!
 # Wait for rendering
 sleep 3
 
-# Find simulator window ID
+# Find simulator window ID (check on-screen first, then all windows)
 WINDOW_ID=$(swift -e '
 import CoreGraphics
-if let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] {
-    for w in windows {
-        let name = w[kCGWindowOwnerName as String] as? String ?? ""
-        if name.contains("Connect IQ") {
-            print(w[kCGWindowNumber as String] as? Int ?? 0)
-            break
+for option: CGWindowListOption in [.optionOnScreenOnly, .optionAll] {
+    if let windows = CGWindowListCopyWindowInfo(option, kCGNullWindowID) as? [[String: Any]] {
+        for w in windows {
+            let name = w[kCGWindowOwnerName as String] as? String ?? ""
+            let layer = w[kCGWindowLayer as String] as? Int ?? -1
+            if name.contains("Connect IQ") && layer == 0 {
+                print(w[kCGWindowNumber as String] as? Int ?? 0)
+                exit(0)
+            }
         }
     }
 }
@@ -49,7 +50,6 @@ if [ -z "$WINDOW_ID" ] || [ "$WINDOW_ID" = "0" ]; then
     exit 1
 fi
 
-# Capture screenshot
+# Capture screenshot (overwrite latest)
 screencapture -l "$WINDOW_ID" "$OUTPUT" 2>/dev/null
-ln -sf "$OUTPUT" "$LATEST"
 echo "Screenshot saved to $OUTPUT"

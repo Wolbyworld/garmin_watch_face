@@ -37,6 +37,7 @@ module Settings {
     var _accentColor = 0;       // 0=Teal, 1=Orange, 2=Blue, 3=Purple, 4=Red
     var _timeColor = 0;         // 0=White, 1=WarmWhite, 2=CoolWhite
     var _showBattery = 0;       // 0=Always, 1=<50%, 2=<20%, 3=Off
+    var _timeFont = 0;          // 0=Bold, 1=Medium, 2=Light
 
     var _cacheValid = false;
 
@@ -92,6 +93,7 @@ module Settings {
         _accentColor = getNumberProperty(app, "accentColor", 0);
         _timeColor = getNumberProperty(app, "timeColor", 0);
         _showBattery = getNumberProperty(app, "showBattery", 0);
+        _timeFont = getNumberProperty(app, "timeFont", 0);
 
         _cacheValid = true;
     }
@@ -313,6 +315,11 @@ module Settings {
     function getShowBattery() {
         ensureCache();
         return _showBattery;
+    }
+
+    function getTimeFont() {
+        ensureCache();
+        return _timeFont;
     }
 
     // Check if battery should be displayed based on current level and setting

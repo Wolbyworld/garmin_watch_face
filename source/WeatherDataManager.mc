@@ -31,6 +31,7 @@ module WeatherDataManager {
     var currentTemp = null;
     var locationName = "Unknown";
     var weatherSource = "garmin";  // "garmin" or "open-meteo"
+    var currentCondition = null;  // Weather.CONDITION_* code
 
     // Cache management
     var lastFetchTime = null;
@@ -294,6 +295,10 @@ module WeatherDataManager {
 
         if (conditions.temperature != null) {
             currentTemp = conditions.temperature;
+        }
+
+        if (conditions has :condition && conditions.condition != null) {
+            currentCondition = conditions.condition;
         }
 
         // Try to get location name from various sources

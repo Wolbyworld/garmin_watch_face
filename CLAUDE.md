@@ -131,16 +131,62 @@ SDK_PATH="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-
 ./preview.sh                  # default: fenix847mm
 ./preview.sh fenix847mm       # explicit device
 
-# Screenshot is saved to screenshots/<device>-<timestamp>.png
-# Also symlinked to screenshots/latest.png
+# Screenshot saved to screenshots/latest.png (overwritten each time)
 # Claude reads screenshots/latest.png to SEE the watch face
 ```
 
 **The iteration loop:**
 1. Edit source code
 2. Run `./preview.sh` (~5 seconds)
-3. Read `screenshots/latest.png` to see the result
-4. Fix issues and repeat
+3. Read `screenshots/latest.png` for a full overview
+4. **ALWAYS crop-zoom** the area you changed — the full thumbnail is too small to judge pixel alignment
+5. Read the cropped image to verify, fix issues, repeat
+
+**Crop-zoom protocol (`sips`):**
+
+The full screenshot is **1562×2090 px** (simulator window capture of the fenix847mm). The watch dial is centered within it. Use `sips -c` to crop specific zones:
+
+```bash
+# Syntax: sips -c <height> <width> --cropOffset <y> <x> <input> -o <output>
+#   height/width = size of the crop rectangle
+#   y/x = top-left corner of the crop (from top-left of image)
+
+# Named zones (copy-paste ready):
+sips -c 100 500 --cropOffset 560 530 screenshots/latest.png -o screenshots/detail.png  # HEADER (icon + temp + location)
+sips -c 350 850 --cropOffset 530 350 screenshots/latest.png -o screenshots/detail.png  # CHART (weather chart + day labels)
+sips -c 150 600 --cropOffset 810 480 screenshots/latest.png -o screenshots/detail.png  # DATE (date line + week badge)
+sips -c 300 700 --cropOffset 890 420 screenshots/latest.png -o screenshots/detail.png  # TIME (time digits + seconds/AM-PM)
+sips -c 350 800 --cropOffset 1130 370 screenshots/latest.png -o screenshots/detail.png # BOTTOM (rings + world clocks + icons)
+```
+
+Visual map of crop zones on the 1562×2090 screenshot:
+```
+y=530  ┌─ HEADER ──────────┐  (100×500 @ 560,530)
+y=530  ┌─── CHART ─────────────┐  (350×850 @ 530,350)
+y=810  │  ┌─ DATE ──────┐      │  (150×600 @ 810,480)
+y=890  │  ┌─ TIME ──────────┐  │  (300×700 @ 890,420)
+y=1130 └──┌─ BOTTOM ────────────┐  (350×800 @ 1130,370)
+```
+
+**Rules:**
+- NEVER declare a UI change "looks good" from the full thumbnail alone
+- After cropping, Read the `screenshots/detail.png` file to actually see it
+- If the crop misses your target, adjust offsets and re-crop — don't guess
+
+**Multi-value testing for activity-dependent UI:**
+
+When changes affect step fill, rings, or any activity-based display, test at multiple levels by editing `DEBUG_STEPS` / `DEBUG_FLOORS` / etc. constants in WatchFaceView.mc:
+
+```monkeyc
+// Set DEBUG_SIMULATOR = true, then test each set (build + crop-verify each):
+// Set 1: Low    → DEBUG_STEPS=3000  (30%)  GOAL=10000, FLOORS=2, HR=55, BB=30
+// Set 2: Mid    → DEBUG_STEPS=6700  (67%)  GOAL=10000, FLOORS=5, HR=82, BB=54
+// Set 3: High   → DEBUG_STEPS=8900  (89%)  GOAL=10000, FLOORS=8, HR=95, BB=85
+// Set 4: Over   → DEBUG_STEPS=13500 (135%) GOAL=10000, FLOORS=14, HR=68, BB=72
+// IMPORTANT: Set DEBUG_SIMULATOR = false before committing!
+```
+
+At each level, crop the TIME zone and BOTTOM zone, then visually compare that the time fill percentage matches the ring fill percentage.
 
 **Manual build (without preview):**
 ```bash

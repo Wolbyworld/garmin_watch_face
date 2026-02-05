@@ -106,4 +106,10 @@
     <string id="batteryBelow50">Below 50%</string>
     <string id="batteryBelow20">Below 20%</string>
     <string id="batteryOff">Off</string>
+
+    <!-- Time Font -->
+    <string id="timeFont">Time Font</string>
+    <string id="timeFontBold">Bold</string>
+    <string id="timeFontMedium">Medium</string>
+    <string id="timeFontLight">Light</string>
 </strings>

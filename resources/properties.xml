@@ -33,4 +33,5 @@
     <property id="accentColor" type="number">0</property>
     <property id="timeColor" type="number">0</property>
     <property id="showBattery" type="number">0</property>
+    <property id="timeFont" type="number">0</property>
 </properties>
