@@ -100,6 +100,15 @@
 - ~~Weather chart uses simulated data - need to connect real API~~ ✅ Done
 - **HR not showing in ring center** - Changed default from 3 to 1, still not rendering. Need to investigate `WatchFaceView.mc` lines 618-631 center rendering logic
 
+## Temporary Hacks (Remove when settings page is fixed)
+
+### Smart Timezone Substitution (Settings.mc)
+**Problem**: Settings page not working, can't change timezone while traveling.
+**Workaround**: If a configured secondary timezone matches the current local timezone, automatically substitute MAD (Madrid) instead.
+**Location**: `Settings.mc` - `getEffectiveTimezoneIndex()` function
+**Example**: In São Paulo (UTC-3) with SAO configured → shows MAD instead
+**To remove**: Delete `getEffectiveTimezoneIndex()`, `getLocalOffset()`, `FALLBACK_CITY_INDEX` and revert the timezone getters to use `_timezone1`/`_timezone2` directly
+
 ## Fixed (January 2026)
 
 - Location name: Added empty string check and fallback logic
@@ -109,7 +118,7 @@
 - Battery indicator: Added with color change for low battery
 - Real HR: Reads from Activity.getActivityInfo() with history fallback
 - Real Body Battery: Reads from SensorHistory.getBodyBatteryHistory()
-- **Time fill visual fix**: Scaled progress by 1.5x so 30% real progress shows ~45% visual fill (digit pixels are mostly in upper 70% of font height)
+- **Time fill**: Now uses same step progress as activity rings (removed 1.5x scaling that caused mismatch - ring showed 67% while time showed 100%)
 - **External Weather API**: Open-Meteo via background service with 30-min fetch interval, falls back to Garmin API
 
 ---

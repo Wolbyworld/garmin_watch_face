@@ -48,6 +48,10 @@ module Settings {
     const CITY_OFFSETS = [-5, -8, -6, -7, -3, -6, 0, 1, 1, 1, 1, 1, 3, 4, 5,
                           8, 8, 9, 9, 10, 12, -10, -9, -5, -8];
 
+    // Fallback city when configured timezone matches local timezone
+    // MAD (Madrid) index = 9, offset = +1
+    const FALLBACK_CITY_INDEX = 9;
+
     // Refresh all settings from properties storage
     function refresh() {
         var app = Application.getApp();
@@ -164,24 +168,45 @@ module Settings {
         return _timezone2;
     }
 
+    // Get local timezone offset in hours (for smart substitution)
+    function getLocalOffset() {
+        var clockTime = System.getClockTime();
+        return clockTime.timeZoneOffset / 3600;
+    }
+
+    // Smart substitution: if configured timezone matches local, use MAD instead
+    // HACK: Temporary workaround while settings page is broken. See TODO.md
+    function getEffectiveTimezoneIndex(configuredIndex) {
+        var configuredOffset = CITY_OFFSETS[configuredIndex];
+        var localOffset = getLocalOffset();
+        if (configuredOffset == localOffset) {
+            return FALLBACK_CITY_INDEX;  // Return MAD
+        }
+        return configuredIndex;
+    }
+
     function getTimezone1Name() {
         ensureCache();
-        return CITY_NAMES[_timezone1];
+        var effectiveIndex = getEffectiveTimezoneIndex(_timezone1);
+        return CITY_NAMES[effectiveIndex];
     }
 
     function getTimezone2Name() {
         ensureCache();
-        return CITY_NAMES[_timezone2];
+        var effectiveIndex = getEffectiveTimezoneIndex(_timezone2);
+        return CITY_NAMES[effectiveIndex];
     }
 
     function getTimezone1Offset() {
         ensureCache();
-        return CITY_OFFSETS[_timezone1];
+        var effectiveIndex = getEffectiveTimezoneIndex(_timezone1);
+        return CITY_OFFSETS[effectiveIndex];
     }
 
     function getTimezone2Offset() {
         ensureCache();
-        return CITY_OFFSETS[_timezone2];
+        var effectiveIndex = getEffectiveTimezoneIndex(_timezone2);
+        return CITY_OFFSETS[effectiveIndex];
     }
 
     // === Weather Chart Getters ===

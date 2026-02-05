@@ -520,15 +520,10 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         var timeStr = hour.format("%d") + ":" + min.format("%02d");
 
-        var stepProgress = 0.0;
-        if (DEBUG_SIMULATOR) {
-            stepProgress = DEBUG_STEPS.toFloat() / DEBUG_STEP_GOAL.toFloat();
-        } else {
-            var actInfo = ActivityMonitor.getInfo();
-            if (actInfo != null && actInfo.steps != null && actInfo.stepGoal != null && actInfo.stepGoal > 0) {
-                stepProgress = actInfo.steps.toFloat() / actInfo.stepGoal.toFloat();
-            }
-        }
+        // Use the same step progress calculation as activity rings for consistency
+        var activityData = getActivityDataRaw();
+        var stepProgress = activityData[:stepsProgress];
+        // Cap at 1.0 for visual fill (we don't show overflow in time digits)
         if (stepProgress > 1.0) { stepProgress = 1.0; }
 
         // Use smaller font on MIP displays - NUMBER_HOT may not exist on all devices
@@ -537,9 +532,7 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         var textTop = baseY - (fontHeight / 2);
         var textBottom = baseY + (fontHeight / 2);
-        var scaledProgress = stepProgress * 1.5;
-        if (scaledProgress > 1.0) { scaledProgress = 1.0; }
-        var fillPixels = (fontHeight * scaledProgress).toNumber();
+        var fillPixels = (fontHeight * stepProgress).toNumber();
         var fillY = textBottom - fillPixels;
 
         if (fontHeight > fillPixels) {

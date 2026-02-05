@@ -99,7 +99,7 @@ The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face t
   - Falls back to default location (Pozuelo de Alarcón) after device reset
   - Falls back to Garmin API if external data unavailable
   - Red warning cloud shown when using default location (no GPS data)
-- **Time fill visual fix** - Scaled by 1.5x so visual fill matches perceived completion
+- **Time fill** - Uses same step progress as activity rings (no scaling, direct 1:1 match)
 - **Fenix 6S MIP Support** ✅ Added
   - Simplified layout optimized for 240x240 display
   - No activity rings (too small for MIP)
