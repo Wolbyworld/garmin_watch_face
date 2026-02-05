@@ -1,0 +1,10 @@
+screenshots/
+*.prg
+*.prg.debug.xml
+*-settings.json
+developer_key.der
+gen/
+mir/
+internal-mir/
+external-mir/
+.DS_Store

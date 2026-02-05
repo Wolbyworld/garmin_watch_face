@@ -119,12 +119,37 @@ The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face t
   openssl pkcs8 -topk8 -inform PEM -outform DER -in developer_key_raw.pem -out developer_key.der -nocrypt
   ```
 
-### Build & Run Commands
+### Build, Preview & Iterate
+
+**Primary workflow — use `preview.sh` for visual iteration:**
+```bash
+# Prerequisite: simulator must be running (launch once per session)
+SDK_PATH="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-8.4.0-2025-12-03-5122605dc"
+"$SDK_PATH/bin/connectiq" &
+
+# Build + push to simulator + capture screenshot (one command)
+./preview.sh                  # default: fenix847mm
+./preview.sh fenix847mm       # explicit device
+
+# Screenshot is saved to screenshots/<device>-<timestamp>.png
+# Also symlinked to screenshots/latest.png
+# Claude reads screenshots/latest.png to SEE the watch face
+```
+
+**The iteration loop:**
+1. Edit source code
+2. Run `./preview.sh` (~5 seconds)
+3. Read `screenshots/latest.png` to see the result
+4. Fix issues and repeat
+
+**Manual build (without preview):**
 ```bash
 SDK_PATH="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-8.4.0-2025-12-03-5122605dc"
 "$SDK_PATH/bin/monkeyc" -d fenix847mm -f monkey.jungle -o watchface.prg -y developer_key.der
 "$SDK_PATH/bin/monkeydo" watchface.prg fenix847mm
 ```
+
+**Note:** The simulator crashes on first `monkeydo` push after launch. Second push works. The `preview.sh` script runs monkeydo in background — if the screenshot shows an empty sim, just run it again.
 
 ### Monkey C Language Gotchas
 1. **Type annotations** - Generally avoid, except for HTTP callbacks (SDK 8.4.0+ requires them):
@@ -311,7 +336,9 @@ garmin_watch_face/
 ├── manifest.xml
 ├── monkey.jungle
 ├── developer_key.der
+├── preview.sh               # Build + push + screenshot (./preview.sh fenix847mm)
 ├── simulation-data.json     # Mock weather data for simulator
+├── screenshots/             # Auto-generated simulator screenshots (gitignored)
 ├── CLAUDE.md
 ├── TODO.md
 ├── source/
@@ -419,15 +446,10 @@ Colors are quantized to 6 levels per channel: `0x00`, `0x55`, `0xAA`, `0xFF`
 ### Build Commands
 
 ```bash
+# Preferred: use preview.sh for visual iteration (see "Build, Preview & Iterate" above)
+./preview.sh fenix847mm
+
+# Manual build (for sideloading to real device)
 SDK_PATH="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-8.4.0-2025-12-03-5122605dc"
-
-# Build for Fenix 8 AMOLED
 "$SDK_PATH/bin/monkeyc" -d fenix847mm -f monkey.jungle -o watchface-f8.prg -y developer_key.der
-
-# Build for Fenix 6S MIP
-"$SDK_PATH/bin/monkeyc" -d fenix6s -f monkey.jungle -o watchface-f6s.prg -y developer_key.der
-
-# Run in simulator
-"$SDK_PATH/bin/monkeydo" watchface-f6s.prg fenix6s
-"$SDK_PATH/bin/monkeydo" watchface-f8.prg fenix847mm
 ```
