@@ -23,6 +23,7 @@ class WatchFaceView extends WatchUi.WatchFace {
     private const DEBUG_FLOOR_GOAL = 10;
     private const DEBUG_BODY_BATTERY = 54;
     private const DEBUG_HR = 82;
+    private const DEBUG_MOVE_BAR = 3;
 
     function initialize() {
         WatchFace.initialize();
@@ -60,6 +61,7 @@ class WatchFaceView extends WatchUi.WatchFace {
         drawDate(dc);
         drawTime(dc);
         drawStats(dc);
+        drawMoveBar(dc);
     }
 
     function onEnterSleep() {
@@ -691,6 +693,9 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         var timeStr = hour.format("%d") + ":" + min.format("%02d");
 
+        // Shift time left so the combined block (time + seconds/AM) looks centered
+        var timeCenter = Theme.isMIPDisplay ? center : center - 15;
+
         // Use the same step progress calculation as activity rings for consistency
         var activityData = getActivityDataRaw();
         var stepProgress = activityData[:stepsProgress];
@@ -720,7 +725,7 @@ class WatchFaceView extends WatchUi.WatchFace {
         if (fillY > textTop) {
             dc.setClip(0, textTop, Theme.screenWidth, fillY - textTop);
             dc.setColor(Theme.TIME_UNFILLED, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(center, baseY, timeFont, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(timeCenter, baseY, timeFont, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.clearClip();
         }
 
@@ -728,7 +733,7 @@ class WatchFaceView extends WatchUi.WatchFace {
         if (fillHeight > 0) {
             dc.setClip(0, fillY, Theme.screenWidth, fillHeight);
             dc.setColor(Theme.TIME_FILL, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(center, baseY, timeFont, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(timeCenter, baseY, timeFont, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.clearClip();
         }
 
@@ -743,7 +748,7 @@ class WatchFaceView extends WatchUi.WatchFace {
             }
             var subFont = Graphics.FONT_XTINY;
             var timeWidth = dc.getTextWidthInPixels(timeStr, timeFont);
-            var rightX = center + (timeWidth / 2) + 4;
+            var rightX = timeCenter + (timeWidth / 2) + 4;
             // Exact baseline alignment using font ascent metrics
             var timeBaseline = baseY - (fontHeight / 2) + dc.getFontAscent(timeFont);
             var subBaseline = dc.getFontAscent(subFont);
@@ -1070,96 +1075,6 @@ class WatchFaceView extends WatchUi.WatchFace {
         };
     }
 
-    private function getActivityData() {
-        var currentSteps = 0;
-        var stepsProgress = 0.0;
-        var currentFloors = 0;
-        var floorsProgress = 0.0;
-        var bodyBattery = 0;
-        var bodyBatteryProgress = 0.0;
-        var currentHR = 0;
-        var hrProgress = 0.0;
-
-        if (DEBUG_SIMULATOR) {
-            currentSteps = DEBUG_STEPS;
-            stepsProgress = DEBUG_STEPS.toFloat() / DEBUG_STEP_GOAL.toFloat();
-            if (stepsProgress > 1.0) { stepsProgress = 1.0; }
-
-            currentFloors = DEBUG_FLOORS;
-            floorsProgress = DEBUG_FLOORS.toFloat() / DEBUG_FLOOR_GOAL.toFloat();
-            if (floorsProgress > 1.0) { floorsProgress = 1.0; }
-
-            bodyBattery = DEBUG_BODY_BATTERY;
-            bodyBatteryProgress = bodyBattery / 100.0;
-
-            currentHR = DEBUG_HR;
-            hrProgress = (currentHR - 40).toFloat() / 160.0;  // 40-200 range
-            if (hrProgress > 1.0) { hrProgress = 1.0; }
-            if (hrProgress < 0.0) { hrProgress = 0.0; }
-        } else {
-            // Get Heart Rate
-            var activityInfo = Activity.getActivityInfo();
-            if (activityInfo != null && activityInfo.currentHeartRate != null) {
-                currentHR = activityInfo.currentHeartRate;
-            } else {
-                var hrIterator = ActivityMonitor.getHeartRateHistory(1, true);
-                if (hrIterator != null) {
-                    var hrSample = hrIterator.next();
-                    if (hrSample != null && hrSample.heartRate != null && hrSample.heartRate != ActivityMonitor.INVALID_HR_SAMPLE) {
-                        currentHR = hrSample.heartRate;
-                    }
-                }
-            }
-            hrProgress = (currentHR - 40).toFloat() / 160.0;
-            if (hrProgress > 1.0) { hrProgress = 1.0; }
-            if (hrProgress < 0.0) { hrProgress = 0.0; }
-
-            // Get Body Battery
-            if (Toybox has :SensorHistory && SensorHistory has :getBodyBatteryHistory) {
-                var bbIterator = SensorHistory.getBodyBatteryHistory({:period => 1, :order => SensorHistory.ORDER_NEWEST_FIRST});
-                if (bbIterator != null) {
-                    var bbSample = bbIterator.next();
-                    if (bbSample != null && bbSample.data != null) {
-                        bodyBattery = bbSample.data.toNumber();
-                        bodyBatteryProgress = bodyBattery / 100.0;
-                    }
-                }
-            }
-
-            var actInfo = ActivityMonitor.getInfo();
-            if (actInfo != null) {
-                if (actInfo.steps != null) {
-                    currentSteps = actInfo.steps;
-                }
-                if (actInfo.stepGoal != null && actInfo.stepGoal > 0) {
-                    stepsProgress = currentSteps.toFloat() / actInfo.stepGoal.toFloat();
-                    if (stepsProgress > 1.0) { stepsProgress = 1.0; }
-                }
-
-                if (actInfo.floorsClimbed != null) {
-                    currentFloors = actInfo.floorsClimbed;
-                }
-                var floorGoal = 10;
-                if (actInfo.floorsClimbedGoal != null && actInfo.floorsClimbedGoal > 0) {
-                    floorGoal = actInfo.floorsClimbedGoal;
-                }
-                floorsProgress = currentFloors.toFloat() / floorGoal.toFloat();
-                if (floorsProgress > 1.0) { floorsProgress = 1.0; }
-            }
-        }
-
-        return {
-            :steps => currentSteps,
-            :stepsProgress => stepsProgress,
-            :floors => currentFloors,
-            :floorsProgress => floorsProgress,
-            :bodyBattery => bodyBattery,
-            :bodyBatteryProgress => bodyBatteryProgress,
-            :hr => currentHR,
-            :hrProgress => hrProgress
-        };
-    }
-
     private function getRingData(dataType, stepsProgress, floorsProgress, bodyBatteryProgress, hrProgress) {
         switch (dataType) {
             case 0: return { :progress => stepsProgress };
@@ -1195,7 +1110,7 @@ class WatchFaceView extends WatchUi.WatchFace {
             var tz1Hour = (clockTime.hour - localOffset + tz1Offset + 48) % 24;
             var tz1Min = clockTime.min;
 
-            var tzY1 = count >= 2 ? ringsY - 30 : ringsY - 10;
+            var tzY1 = count >= 2 ? ringsY - 41 : ringsY - 21;
 
             dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
             dc.drawText(labelX, tzY1, Graphics.FONT_XTINY, tz1Name, Graphics.TEXT_JUSTIFY_LEFT);
@@ -1209,7 +1124,7 @@ class WatchFaceView extends WatchUi.WatchFace {
             var tz2Hour = (clockTime.hour - localOffset + tz2Offset + 48) % 24;
             var tz2Min = clockTime.min;
 
-            var tzY2 = ringsY + 10;
+            var tzY2 = ringsY - 1;
 
             dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
             dc.drawText(labelX, tzY2, Graphics.FONT_XTINY, tz2Name, Graphics.TEXT_JUSTIFY_LEFT);
@@ -1489,19 +1404,29 @@ class WatchFaceView extends WatchUi.WatchFace {
         dc.setPenWidth(1);
     }
 
-    private function drawRing(dc, x, y, radius, stroke, progress, color) {
-        dc.setPenWidth(stroke);
+    private function drawMoveBar(dc) {
+        if (Theme.isMIPDisplay) { return; }
 
-        dc.setColor(Theme.dimColor(color, 0.35), Graphics.COLOR_TRANSPARENT);
-        dc.drawArc(x, y, radius, Graphics.ARC_CLOCKWISE, 90, -270);
-
-        if (progress > 0.01) {
-            var sweepDeg = (progress * 360).toNumber();
-            if (sweepDeg > 360) { sweepDeg = 360; }
-            dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-            dc.drawArc(x, y, radius, Graphics.ARC_CLOCKWISE, 90, 90 - sweepDeg);
+        var moveBarLevel = 0;
+        if (DEBUG_SIMULATOR) {
+            moveBarLevel = DEBUG_MOVE_BAR;
+        } else {
+            var actInfo = ActivityMonitor.getInfo();
+            if (actInfo != null && actInfo.moveBarLevel != null) {
+                moveBarLevel = actInfo.moveBarLevel;
+            }
         }
 
+        if (moveBarLevel <= 0) { return; }
+
+        var center = Theme.getCenter();
+        var radius = center - 2;
+        var halfSpread = moveBarLevel * 36;
+
+        dc.setPenWidth(3);
+        dc.setColor(0xC62828, Graphics.COLOR_TRANSPARENT);
+        dc.drawArc(center, center, radius, Graphics.ARC_CLOCKWISE,
+            270 + halfSpread, 270 - halfSpread);
         dc.setPenWidth(1);
     }
 
