@@ -16,14 +16,13 @@ The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face t
    - Wind (subtle tick marks or encoding)
    - Hour markers (small dim gray numbers)
    - Day labels + separators (WE, TH, FR...)
-   - "Now" indicator (bright vertical line at current time)
 3. **Date** (weekday, day, month, ISO week number)
 4. **Time** (large digits, seconds as small superscript, ~30% of display height)
 5. **Step goal fill effect** on time digits (filled portion = % of step goal achieved)
 6. **Heart rate** (current BPM with heart icon)
 7. **Steps / distance**
 8. **Data field** (configurable: elevation, floors, calories, etc.)
-9. **Move bar** (inactivity indicator, muted red dots)
+9. **Move bar** (inactivity indicator, rising red arc at display edge)
 10. **Battery** (top-right, small and dim)
 
 ## Design Requirements
@@ -100,6 +99,8 @@ The PNG/JPEG files in this folder show the original "Rain & Clouds" watch face t
   - Falls back to Garmin API if external data unavailable
   - Red warning cloud shown when using default location (no GPS data)
 - **Time fill** - Uses same step progress as activity rings (no scaling, direct 1:1 match)
+- **Time block** shifted 15px left on AMOLED so HH:MM + :ss AM appears visually centered
+- **Move bar** ✅ Rising inactivity arc at display edge, level 1-5 scaling to full circle
 - **Fenix 6S MIP Support** ✅ Added
   - Simplified layout optimized for 240x240 display
   - No activity rings (too small for MIP)
@@ -187,6 +188,29 @@ When changes affect step fill, rings, or any activity-based display, test at mul
 ```
 
 At each level, crop the TIME zone and BOTTOM zone, then visually compare that the time fill percentage matches the ring fill percentage.
+
+**Extreme weather testing for chart boundary checks:**
+
+The simulator's mock/fallback weather data is mild and flat — it won't catch overlaps that real-world data causes (wide temp swings, dense clouds). When `DEBUG_SIMULATOR = true`, `drawWeatherChart()` injects synthetic extreme weather data:
+- Temperature range: -5°C to 35°C (sinusoidal swings hitting both extremes)
+- Cloud cover: 80% heavy clouds (tall puffs that test header clearance)
+- Precipitation: periodic 60% rain bands
+- Wind: variable 5-15 km/h
+
+Always crop-verify the HEADER+CHART zone after any chart or header layout change:
+```bash
+sips -c 350 850 --cropOffset 530 350 screenshots/latest.png -o screenshots/detail.png  # CHART zone
+sips -c 200 600 --cropOffset 530 480 screenshots/latest.png -o screenshots/detail.png  # HEADER-CHART overlap
+```
+
+**Full layout sanity check (do this before any production deploy):**
+
+After finishing a feature, do a quick full-layout scan — not just the area you changed. Crop each zone and verify no overlaps:
+1. HEADER — icon + temp clear of chart below
+2. CHART — curves/clouds within bounds, day labels readable
+3. DATE — week badge doesn't collide with chart above or time below
+4. TIME — digits + seconds/AM clear of display edges and move bar
+5. BOTTOM — rings, world clocks, icons all clear of move bar arc
 
 **Manual build (without preview):**
 ```bash
@@ -375,6 +399,34 @@ function brightenColor(color, factor) {
     return (r.toNumber() << 16) | (g.toNumber() << 8) | b.toNumber();
 }
 ```
+
+### Move Bar Design
+
+**Rising Inactivity Arc**: A muted red arc hugging the display edge, growing symmetrically from 6 o'clock as inactivity increases.
+
+```
+Level 0: (nothing)
+Level 1: tiny sliver at bottom (72°)
+Level 2: wider (144°)
+Level 3: past halfway (216°)
+Level 4: most of circle (288°)
+Level 5: full circle (360°)
+```
+
+**Implementation details:**
+- **Radius**: `center - 2` (2px from display edge, tight to bezel)
+- **Stroke**: 3px (`setPenWidth(3)`)
+- **Color**: Hardcoded `0xC62828` (muted red) — not in Theme system
+- **Angles**: `halfSpread = level × 36°`, arc from `270 + halfSpread` to `270 - halfSpread`
+- **Skipped**: On MIP displays (240px too small) and AOD mode
+- **Draw order**: Last in `onUpdate()` so it overlays everything
+- **Data source**: `ActivityMonitor.getInfo().moveBarLevel` (0-5)
+- **Debug**: `DEBUG_MOVE_BAR` constant for simulator testing
+
+**Layout clearance for arc**: When adding edge-hugging UI elements on a round display, content near the sides gets clipped by the arc's curve. Key adjustments made:
+- Time block shifted 15px left (`center - 15`) so seconds/AM text clears the right side
+- World clocks raised 11px total (`ringsY - 41` / `ringsY - 1`) to clear the bottom curve
+- Always verify clearance at level 5 (full circle) by cropping all edge zones
 
 ### Project Structure (Simplified)
 ```

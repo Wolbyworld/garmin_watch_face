@@ -162,8 +162,8 @@ class WatchFaceView extends WatchUi.WatchFace {
             dc.setColor(Theme.getColor(Theme.TIME_PRIMARY), Graphics.COLOR_TRANSPARENT);
             dc.drawText(center, headerY, Graphics.FONT_XTINY, headerStr, Graphics.TEXT_JUSTIFY_CENTER);
         } else {
-            // AMOLED: [icon] 15° · Pozuelo at Y=14
-            var headerY = 14;
+            // AMOLED: [icon] 15° · Pozuelo at Y=8
+            var headerY = 8;
             var headerStr;
             if (hasRealLocation) {
                 headerStr = tempStr + " · " + locationStr;
@@ -343,10 +343,10 @@ class WatchFaceView extends WatchUi.WatchFace {
 
     private function drawWeatherChart(dc) {
         // Chart dimensions - scale for MIP displays
-        var chartX = Theme.isMIPDisplay ? 20 : 45;
-        var chartY = Theme.isMIPDisplay ? 50 : 34;
-        var chartWidth = Theme.screenWidth - (Theme.isMIPDisplay ? 40 : 90);
-        var chartHeight = Theme.isMIPDisplay ? Theme.getChartHeightMIP() : 115;
+        var chartX = Theme.isMIPDisplay ? 20 : 50;
+        var chartY = Theme.isMIPDisplay ? 50 : 46;
+        var chartWidth = Theme.screenWidth - (Theme.isMIPDisplay ? 40 : 100);
+        var chartHeight = Theme.isMIPDisplay ? Theme.getChartHeightMIP() : 100;
 
         var now = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
         var currentHour = now.hour;
@@ -367,7 +367,36 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         // Safety check - if data not yet loaded, skip rendering
         if (temps == null || hours == null) {
-            return;
+            if (!DEBUG_SIMULATOR) { return; }
+        }
+
+        // Debug weather: generate extreme data to stress-test chart boundaries
+        if (DEBUG_SIMULATOR) {
+            temps = new [96];
+            hours = new [96];
+            precips = new [96];
+            clouds = new [96];
+            winds = new [96];
+            dayHighs = new [4];
+            dayLows = new [4];
+            dayHighIdx = new [4];
+            dayLowIdx = new [4];
+            minTemp = -5.0;
+            maxTemp = 35.0;
+            for (var i = 0; i < 96; i++) {
+                // Wide temp swings: sinusoidal from -5 to 35
+                temps[i] = minTemp + (maxTemp - minTemp) * (0.5 + 0.5 * Math.sin(i * 0.15));
+                hours[i] = (8 + i) % 24;
+                precips[i] = (i % 12 < 4) ? 60 : 0;  // periodic rain
+                clouds[i] = (i % 8 < 5) ? 80 : 20;    // heavy clouds
+                winds[i] = 5.0 + 10.0 * Math.sin(i * 0.2).abs();
+            }
+            for (var d = 0; d < 4; d++) {
+                dayHighs[d] = maxTemp;
+                dayLows[d] = minTemp;
+                dayHighIdx[d] = d * 24 + 14;
+                dayLowIdx[d] = d * 24 + 5;
+            }
         }
 
         var tempRange = WeatherDataManager.getTempRange();
@@ -410,7 +439,7 @@ class WatchFaceView extends WatchUi.WatchFace {
                     dc.setColor(cloudColor, Graphics.COLOR_TRANSPARENT);
 
                     // Draw cloud shape - simplified for MIP
-                    var baseY = chartY + 6;
+                    var baseY = chartY + 10;
 
                     if (Theme.isMIPDisplay) {
                         // MIP: simple single circles
@@ -440,8 +469,8 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         // Temperature curve
         if (Settings.isShowTemperature()) {
-            var tempYStart = chartY + 10;
-            var tempHeight = chartHeight - 25;
+            var tempYStart = chartY + 18;
+            var tempHeight = chartHeight - 33;
 
             dc.setColor(Theme.TEMP_CURVE, Graphics.COLOR_TRANSPARENT);
             dc.setPenWidth(2);
@@ -467,8 +496,8 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         // Wind line (subtle but visible)
         if (Settings.isShowWind()) {
-            var tempYStart = chartY + 10;
-            var tempHeight = chartHeight - 25;
+            var tempYStart = chartY + 18;
+            var tempHeight = chartHeight - 33;
 
             dc.setColor(Theme.dimColor(Theme.WIND_SPEED, 0.5), Graphics.COLOR_TRANSPARENT);
             var prevX = -1;
