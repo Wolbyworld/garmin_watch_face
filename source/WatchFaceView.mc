@@ -371,7 +371,7 @@ class WatchFaceView extends WatchUi.WatchFace {
         }
 
         // Debug weather: generate extreme data to stress-test chart boundaries
-        if (DEBUG_SIMULATOR) {
+        if (DEBUG_SIMULATOR && temps == null) {
             temps = new [96];
             hours = new [96];
             precips = new [96];
@@ -467,29 +467,52 @@ class WatchFaceView extends WatchUi.WatchFace {
             }
         }
 
-        // Temperature curve
+        // Temperature curve with gradient fill
         if (Settings.isShowTemperature()) {
             var tempYStart = chartY + 18;
             var tempHeight = chartHeight - 33;
+            var baselineY = tempYStart + tempHeight;
 
+            // Gradient fill: vertical strips from curve to baseline (AMOLED only)
+            if (!Theme.isMIPDisplay) {
+                for (var i = 0; i < forecastHours && i < 96; i += 2) {
+                    var x = chartX + (i * chartWidth / forecastHours);
+                    var norm = (temps[i] - minTemp) / tempRange;
+                    if (norm < 0.0) { norm = 0.0; }
+                    if (norm > 1.0) { norm = 1.0; }
+                    var top = (tempYStart + tempHeight - (norm * tempHeight)).toNumber();
+                    var fillH = baselineY - top;
+                    if (fillH <= 0) { continue; }
+
+                    var band = fillH / 3;
+                    if (band < 1) { band = 1; }
+                    var w = chartWidth / forecastHours * 2 + 1;
+
+                    dc.setColor(Theme.dimColor(Theme.TEMP_CURVE, 0.18), Graphics.COLOR_TRANSPARENT);
+                    dc.fillRectangle(x, top, w, band);
+                    dc.setColor(Theme.dimColor(Theme.TEMP_CURVE, 0.10), Graphics.COLOR_TRANSPARENT);
+                    dc.fillRectangle(x, top + band, w, band);
+                    dc.setColor(Theme.dimColor(Theme.TEMP_CURVE, 0.04), Graphics.COLOR_TRANSPARENT);
+                    dc.fillRectangle(x, top + band + band, w, fillH - band - band);
+                }
+            }
+
+            // Draw the curve line on top
             dc.setColor(Theme.TEMP_CURVE, Graphics.COLOR_TRANSPARENT);
             dc.setPenWidth(2);
-
             var prevX = -1;
             var prevTempY = -1;
-
             for (var i = 0; i < forecastHours && i < 96; i++) {
                 var x = chartX + (i * chartWidth / forecastHours);
                 var norm = (temps[i] - minTemp) / tempRange;
                 if (norm < 0.0) { norm = 0.0; }
                 if (norm > 1.0) { norm = 1.0; }
-                var y = tempYStart + tempHeight - (norm * tempHeight);
-
+                var y = (tempYStart + tempHeight - (norm * tempHeight)).toNumber();
                 if (prevX >= 0) {
-                    dc.drawLine(prevX, prevTempY, x, y.toNumber());
+                    dc.drawLine(prevX, prevTempY, x, y);
                 }
                 prevX = x;
-                prevTempY = y.toNumber();
+                prevTempY = y;
             }
             dc.setPenWidth(1);
         }
