@@ -1420,9 +1420,9 @@ class WatchFaceView extends WatchUi.WatchFace {
             dc.setColor(Theme.dimColor(color, 0.5), Graphics.COLOR_TRANSPARENT);
             dc.drawArc(x, y, radius, Graphics.ARC_CLOCKWISE, 90, -270);
 
-            // 2. Calculate overflow (capped at 100% extra for visual)
+            // 2. Calculate overflow — modulo so each lap past 100% shows its own 0→360° sweep
             var overflow = progress - 1.0;
-            if (overflow > 1.0) { overflow = 1.0; }
+            overflow = overflow - Math.floor(overflow);
             var overflowDeg = (overflow * 360).toNumber();
             if (overflowDeg < 8) { overflowDeg = 8; }
 
