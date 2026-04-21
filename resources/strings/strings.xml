@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<strings>
+    <string id="AppName">OLED Weather</string>
+
+    <!-- Group Titles -->
+    <string id="groupTimeDate">Time &amp; Date</string>
+    <string id="groupWorldClocks">World Clocks</string>
+    <string id="groupWeatherChart">Weather Chart</string>
+    <string id="groupActivityRings">Activity Rings</string>
+    <string id="groupAppearance">Appearance</string>
+
+    <!-- Time & Date Settings -->
+    <string id="clockFormat">Clock Format</string>
+    <string id="clockFormat12h">12 Hour</string>
+    <string id="clockFormat24h">24 Hour</string>
+    <string id="clockFormatSystem">System</string>
+    <string id="showSeconds">Show Seconds</string>
+    <string id="dateFormat">Date Format</string>
+    <string id="dateFormatWedJan15">Wed 15 Jan</string>
+    <string id="dateFormat15JanWed">15 Jan Wed</string>
+    <string id="dateFormatJan15">Jan 15</string>
+    <string id="showWeekNumber">Show Week Number</string>
+
+    <!-- World Clock Settings -->
+    <string id="worldClockCount">World Clocks</string>
+    <string id="worldClockOff">Off</string>
+    <string id="worldClockOne">One</string>
+    <string id="worldClockTwo">Two</string>
+    <string id="timezone1">Timezone 1</string>
+    <string id="timezone2">Timezone 2</string>
+
+    <!-- City Names -->
+    <string id="cityNYC">New York</string>
+    <string id="cityLAX">Los Angeles</string>
+    <string id="cityCHI">Chicago</string>
+    <string id="cityDEN">Denver</string>
+    <string id="citySAO">Sao Paulo</string>
+    <string id="cityMEX">Mexico City</string>
+    <string id="cityLON">London</string>
+    <string id="cityPAR">Paris</string>
+    <string id="cityBER">Berlin</string>
+    <string id="cityMAD">Madrid</string>
+    <string id="cityROM">Rome</string>
+    <string id="cityAMS">Amsterdam</string>
+    <string id="cityMOS">Moscow</string>
+    <string id="cityDUB">Dubai</string>
+    <string id="cityMUM">Mumbai</string>
+    <string id="citySIN">Singapore</string>
+    <string id="cityHKG">Hong Kong</string>
+    <string id="cityTYO">Tokyo</string>
+    <string id="citySEL">Seoul</string>
+    <string id="citySYD">Sydney</string>
+    <string id="cityAKL">Auckland</string>
+    <string id="cityHNL">Honolulu</string>
+    <string id="cityANC">Anchorage</string>
+    <string id="cityTOR">Toronto</string>
+    <string id="cityVAN">Vancouver</string>
+
+    <!-- Weather Chart Settings -->
+    <string id="showWeatherChart">Show Weather Chart</string>
+    <string id="showTemperature">Temperature Curve</string>
+    <string id="showPrecipitation">Precipitation</string>
+    <string id="showClouds">Clouds</string>
+    <string id="showWind">Wind</string>
+    <string id="temperatureUnit">Temperature Unit</string>
+    <string id="tempCelsius">Celsius</string>
+    <string id="tempFahrenheit">Fahrenheit</string>
+    <string id="forecastHours">Forecast Range</string>
+    <string id="forecast48h">48 Hours</string>
+    <string id="forecast72h">72 Hours</string>
+
+    <!-- Activity Ring Settings -->
+    <string id="ringLayout">Ring Layout</string>
+    <string id="ringLayoutAll">All 3 Rings</string>
+    <string id="ringLayout2">2 Rings</string>
+    <string id="ringLayoutOff">Off</string>
+    <string id="outerRing">Outer Ring</string>
+    <string id="middleRing">Middle Ring</string>
+    <string id="innerRing">Inner Ring</string>
+    <string id="dataSteps">Steps</string>
+    <string id="dataFloors">Floors</string>
+    <string id="dataBodyBattery">Body Battery</string>
+    <string id="dataHR">Heart Rate</string>
+    <string id="dataOff">Off</string>
+    <string id="showRingIcons">Show Ring Icons</string>
+
+    <!-- Appearance Settings -->
+    <string id="theme">Theme</string>
+    <string id="themeDark">Dark</string>
+    <string id="themeWarm">Warm</string>
+    <string id="themeCool">Cool</string>
+    <string id="themeHighContrast">High Contrast</string>
+    <string id="accentColor">Accent Color</string>
+    <string id="accentTeal">Teal</string>
+    <string id="accentOrange">Orange</string>
+    <string id="accentBlue">Blue</string>
+    <string id="accentPurple">Purple</string>
+    <string id="accentRed">Red</string>
+    <string id="timeColor">Time Color</string>
+    <string id="timeWhite">White</string>
+    <string id="timeWarmWhite">Warm White</string>
+    <string id="timeCoolWhite">Cool White</string>
+    <string id="showBattery">Battery Display</string>
+    <string id="batteryAlways">Always</string>
+    <string id="batteryBelow50">Below 50%</string>
+    <string id="batteryBelow20">Below 20%</string>
+    <string id="batteryOff">Off</string>
+
+    <!-- Time Font -->
+    <string id="timeFont">Time Font</string>
+    <string id="timeFontBold">Bold</string>
+    <string id="timeFontMedium">Medium</string>
+    <string id="timeFontLight">Light</string>
+</strings>
