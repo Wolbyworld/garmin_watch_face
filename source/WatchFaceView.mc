@@ -13,6 +13,29 @@ using Toybox.Application;
 class WatchFaceView extends WatchUi.WatchFace {
 
     private var _isAwake = true;
+    private var _secondsRegionValid = false;
+    private var _secondsX = 0;
+    private var _secondsY = 0;
+    private var _secondsWidth = 0;
+    private var _secondsHeight = 0;
+    private var _secondsIs24h = true;
+
+    // Activity snapshot: refreshed once for each full update and reused by all
+    // renderers. This avoids repeated sensor/history reads and dictionaries.
+    private var _currentSteps = 0;
+    private var _stepsProgress = 0.0;
+    private var _currentFloors = 0;
+    private var _floorsProgress = 0.0;
+    private var _bodyBattery = 0;
+    private var _bodyBatteryProgress = 0.0;
+    private var _currentHR = 0;
+    private var _hrProgress = 0.0;
+    private var _moveBarLevel = 0;
+
+    private const CHART_DAY_NAMES = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+    private const DATE_DAY_NAMES = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+    private const MONTH_NAMES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+    private const AOD_DAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
     // SIMULATOR DEBUG MODE: Set to true for testing in simulator, false for release
     // The Garmin simulator does NOT populate ActivityMonitor data from simulation-data.json
@@ -38,6 +61,7 @@ class WatchFaceView extends WatchUi.WatchFace {
 
     function onUpdate(dc) {
         Theme.initLayout(dc);
+        _secondsRegionValid = false;
 
         // Apply theme from settings
         Theme.applyTheme(Settings.getTheme(), Settings.getAccentColor(), Settings.getTimeColor());
@@ -52,6 +76,8 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         // Refresh weather data if cache is stale
         WeatherDataManager.refreshIfNeeded();
+        Settings.refreshTimezoneCache();
+        refreshActivityData();
 
         drawBattery(dc);
         drawHeader(dc);
@@ -62,6 +88,28 @@ class WatchFaceView extends WatchUi.WatchFace {
         drawTime(dc);
         drawStats(dc);
         drawMoveBar(dc);
+    }
+
+    // Garmin calls this once per second on supported devices. Only repaint the
+    // seconds text; the normal full update remains once per minute.
+    function onPartialUpdate(dc) {
+        if (!_isAwake || !_secondsRegionValid || !Settings.isShowSeconds()) {
+            return;
+        }
+
+        var clockTime = System.getClockTime();
+        var subText = ":" + clockTime.sec.format("%02d");
+        if (!_secondsIs24h) {
+            subText = subText + (clockTime.hour >= 12 ? " PM" : " AM");
+        }
+
+        dc.setClip(_secondsX, _secondsY, _secondsWidth, _secondsHeight);
+        dc.setColor(Theme.BG, Theme.BG);
+        dc.fillRectangle(_secondsX, _secondsY, _secondsWidth, _secondsHeight);
+        dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(_secondsX + 2, _secondsY + 2, Graphics.FONT_XTINY,
+            subText, Graphics.TEXT_JUSTIFY_LEFT);
+        dc.clearClip();
     }
 
     function onEnterSleep() {
@@ -559,7 +607,6 @@ class WatchFaceView extends WatchUi.WatchFace {
         }
 
         // Day separators (dotted lines at midnight)
-        var days = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
         var dayLabelY = chartY + chartHeight + 3;
 
         for (var i = 6; i < forecastHours && i < 96; i += 6) {
@@ -586,7 +633,7 @@ class WatchFaceView extends WatchUi.WatchFace {
         var todayX = chartX + (todayCenter * chartWidth / forecastHours);
         var todayIdx = (dayOfWeek - 1);
         if (todayIdx < 0) { todayIdx = 6; }
-        drawMiniText(dc, todayX, dayLabelY, days[todayIdx], dayLabelColor);
+        drawMiniText(dc, todayX, dayLabelY, CHART_DAY_NAMES[todayIdx], dayLabelColor);
 
         // Tomorrow's label (day +1)
         var day1Start = hoursUntilMidnight;
@@ -596,7 +643,7 @@ class WatchFaceView extends WatchUi.WatchFace {
             var day1Center = (day1Start + day1End) / 2;
             var day1X = chartX + (day1Center * chartWidth / forecastHours);
             var day1Idx = (dayOfWeek) % 7;
-            drawMiniText(dc, day1X, dayLabelY, days[day1Idx], dayLabelColor);
+            drawMiniText(dc, day1X, dayLabelY, CHART_DAY_NAMES[day1Idx], dayLabelColor);
         }
 
         // Day +2 label
@@ -607,7 +654,7 @@ class WatchFaceView extends WatchUi.WatchFace {
             var day2Center = (day2Start + day2End) / 2;
             var day2X = chartX + (day2Center * chartWidth / forecastHours);
             var day2Idx = (dayOfWeek + 1) % 7;
-            drawMiniText(dc, day2X, dayLabelY, days[day2Idx], dayLabelColor);
+            drawMiniText(dc, day2X, dayLabelY, CHART_DAY_NAMES[day2Idx], dayLabelColor);
         }
 
         // Day +3 label
@@ -618,7 +665,7 @@ class WatchFaceView extends WatchUi.WatchFace {
             var day3Center = (day3Start + day3End) / 2;
             var day3X = chartX + (day3Center * chartWidth / forecastHours);
             var day3Idx = (dayOfWeek + 2) % 7;
-            drawMiniText(dc, day3X, dayLabelY, days[day3Idx], dayLabelColor);
+            drawMiniText(dc, day3X, dayLabelY, CHART_DAY_NAMES[day3Idx], dayLabelColor);
         }
 
         // Temperature boxes (high/low for each visible day) - using mini-digits
@@ -674,21 +721,18 @@ class WatchFaceView extends WatchUi.WatchFace {
         var center = Theme.getCenter();
         var now = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
 
-        var dayNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-        var monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-
         // Format date based on setting
         var dateFormat = Settings.getDateFormat();
         var dateStr;
         if (dateFormat == 0) {
             // Wed 15 Jan
-            dateStr = dayNames[now.day_of_week - 1] + " " + now.day + " " + monthNames[now.month - 1];
+            dateStr = DATE_DAY_NAMES[now.day_of_week - 1] + " " + now.day + " " + MONTH_NAMES[now.month - 1];
         } else if (dateFormat == 1) {
             // 15 Jan Wed
-            dateStr = now.day + " " + monthNames[now.month - 1] + " " + dayNames[now.day_of_week - 1];
+            dateStr = now.day + " " + MONTH_NAMES[now.month - 1] + " " + DATE_DAY_NAMES[now.day_of_week - 1];
         } else {
             // Jan 15
-            dateStr = monthNames[now.month - 1] + " " + now.day;
+            dateStr = MONTH_NAMES[now.month - 1] + " " + now.day;
         }
 
         var showWeekNum = Settings.isShowWeekNumber();
@@ -748,9 +792,8 @@ class WatchFaceView extends WatchUi.WatchFace {
         // Shift time left so the combined block (time + seconds/AM) looks centered
         var timeCenter = Theme.isMIPDisplay ? center : center - 15;
 
-        // Use the same step progress calculation as activity rings for consistency
-        var activityData = getActivityDataRaw();
-        var stepProgress = activityData[:stepsProgress];
+        // Use the same cached step progress as the activity rings.
+        var stepProgress = _stepsProgress;
         // Cap at 1.0 for visual fill (we don't show overflow in time digits)
         if (stepProgress > 1.0) { stepProgress = 1.0; }
 
@@ -765,25 +808,46 @@ class WatchFaceView extends WatchUi.WatchFace {
             else { timeFont = Graphics.FONT_NUMBER_HOT; }
         }
         var fontHeight = dc.getFontHeight(timeFont);
+        var fontAscent = dc.getFontAscent(timeFont);
 
-        var textTop = baseY - (fontHeight / 2);
-        var textBottom = baseY + (fontHeight / 2);
+        // Map step progress onto the visible digit pixels, not the padded font
+        // cell. Digit ink ends at the baseline (no descenders), and Garmin
+        // number fonts pad roughly as much above the caps as below the
+        // baseline, so approximate the ink box as [cellTop + descent, baseline].
+        var fontDescent = fontHeight - fontAscent;
+        var cellTop = baseY - (fontHeight / 2);
+        var inkTop = cellTop + fontDescent;
+        var inkBottom = cellTop + fontAscent;  // baseline
+        var fillRangeHeight = inkBottom - inkTop;
+        if (fillRangeHeight <= 0) {
+            inkTop = cellTop;
+            inkBottom = cellTop + fontHeight;
+            fillRangeHeight = fontHeight;
+        }
 
-        // Fill grows from bottom of text cell upward using full fontHeight
-        var fillHeight = (fontHeight * stepProgress).toNumber();
-        var fillY = textBottom - fillHeight;
+        var fillHeight = (fillRangeHeight * stepProgress).toNumber();
+        var fillY = inkBottom - fillHeight;
 
-        // Unfilled portion (above fill line)
-        if (fillY > textTop) {
-            dc.setClip(0, textTop, Theme.screenWidth, fillY - textTop);
+        if (fillHeight >= fillRangeHeight) {
+            // Goal reached: draw everything filled, no clip, so no sliver of
+            // digit ink above the estimated box stays unfilled
+            dc.setColor(Theme.TIME_FILL, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(timeCenter, baseY, timeFont, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        } else if (fillHeight <= 0) {
+            // No progress: draw everything unfilled, no clip
+            dc.setColor(Theme.TIME_UNFILLED, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(timeCenter, baseY, timeFont, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        } else {
+            // Unfilled portion: clip from screen top so ink above the
+            // estimated box still renders
+            dc.setClip(0, 0, Theme.screenWidth, fillY);
             dc.setColor(Theme.TIME_UNFILLED, Graphics.COLOR_TRANSPARENT);
             dc.drawText(timeCenter, baseY, timeFont, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.clearClip();
-        }
 
-        // Filled portion (fill line to bottom)
-        if (fillHeight > 0) {
-            dc.setClip(0, fillY, Theme.screenWidth, fillHeight);
+            // Filled portion: clip to screen bottom so ink below the baseline
+            // (anti-aliasing) still renders
+            dc.setClip(0, fillY, Theme.screenWidth, Theme.screenHeight - fillY);
             dc.setColor(Theme.TIME_FILL, Graphics.COLOR_TRANSPARENT);
             dc.drawText(timeCenter, baseY, timeFont, timeStr, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.clearClip();
@@ -807,6 +871,18 @@ class WatchFaceView extends WatchUi.WatchFace {
             var subY = timeBaseline - subBaseline;
             dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(rightX, subY, subFont, subText, Graphics.TEXT_JUSTIFY_LEFT);
+
+            if (showSec) {
+                // Store one fixed region for second-by-second partial updates.
+                // "88" is the widest pair for the Garmin number font.
+                _secondsIs24h = is24h;
+                var widestSubText = is24h ? ":88" : ":88 PM";
+                _secondsX = rightX - 2;
+                _secondsY = subY - 2;
+                _secondsWidth = dc.getTextWidthInPixels(widestSubText, subFont) + 4;
+                _secondsHeight = dc.getFontHeight(subFont) + 4;
+                _secondsRegionValid = true;
+            }
         }
     }
 
@@ -841,13 +917,12 @@ class WatchFaceView extends WatchUi.WatchFace {
         var worldClockCount = Settings.getWorldClockCount();
         if (worldClockCount > 0) {
             var baseY = Theme.getWorldClocksY();
-            var localOffset = clockTime.timeZoneOffset / 3600;
 
             if (worldClockCount >= 1) {
                 var tz1Name = Settings.getTimezone1Name();
-                var tz1Offset = Settings.getTimezone1Offset();
-                var tz1Hour = (clockTime.hour - localOffset + tz1Offset + 48) % 24;
-                var tz1Min = clockTime.min;
+                var tz1Minutes = getWorldClockTotalMinutes(clockTime, Settings.getTimezone1OffsetMinutes());
+                var tz1Hour = (tz1Minutes / 60).toNumber();
+                var tz1Min = (tz1Minutes % 60).toNumber();
                 var tzY1 = worldClockCount >= 2 ? baseY - 12 : baseY;
 
                 var tz1Str = tz1Name + " " + tz1Hour.format("%02d") + ":" + tz1Min.format("%02d");
@@ -857,9 +932,9 @@ class WatchFaceView extends WatchUi.WatchFace {
 
             if (worldClockCount >= 2) {
                 var tz2Name = Settings.getTimezone2Name();
-                var tz2Offset = Settings.getTimezone2Offset();
-                var tz2Hour = (clockTime.hour - localOffset + tz2Offset + 48) % 24;
-                var tz2Min = clockTime.min;
+                var tz2Minutes = getWorldClockTotalMinutes(clockTime, Settings.getTimezone2OffsetMinutes());
+                var tz2Hour = (tz2Minutes / 60).toNumber();
+                var tz2Min = (tz2Minutes % 60).toNumber();
                 var tzY2 = baseY + 12;
 
                 var tz2Str = tz2Name + " " + tz2Hour.format("%02d") + ":" + tz2Min.format("%02d");
@@ -870,26 +945,9 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         // HR + Battery row at very bottom
         var statsY = Theme.getStatsRowY();
-        var currentHR = 0;
-
-        // Get Heart Rate
-        var activityInfo = Activity.getActivityInfo();
-        if (activityInfo != null && activityInfo.currentHeartRate != null) {
-            currentHR = activityInfo.currentHeartRate;
-        } else {
-            if (Toybox has :ActivityMonitor) {
-                var hrIterator = ActivityMonitor.getHeartRateHistory(1, true);
-                if (hrIterator != null) {
-                    var hrSample = hrIterator.next();
-                    if (hrSample != null && hrSample.heartRate != null && hrSample.heartRate != ActivityMonitor.INVALID_HR_SAMPLE) {
-                        currentHR = hrSample.heartRate;
-                    }
-                }
-            }
-        }
 
         // Draw heart icon + HR on left side of center
-        var hrStr = currentHR > 0 ? currentHR.format("%d") : "--";
+        var hrStr = _currentHR > 0 ? _currentHR.format("%d") : "--";
         dc.setColor(Theme.getColor(Theme.HR_RING), Graphics.COLOR_TRANSPARENT);
         drawHeartIconSmall(dc, center - 45, statsY - 3);
         dc.drawText(center - 32, statsY, Graphics.FONT_XTINY, hrStr, Graphics.TEXT_JUSTIFY_LEFT);
@@ -933,17 +991,6 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         var ringLayout = Settings.getRingLayout();
 
-        // Get all activity data (without capping at 1.0 for overflow display)
-        var activityData = getActivityDataRaw();
-        var currentSteps = activityData[:steps];
-        var stepsProgress = activityData[:stepsProgress];
-        var currentFloors = activityData[:floors];
-        var floorsProgress = activityData[:floorsProgress];
-        var bodyBattery = activityData[:bodyBattery];
-        var bodyBatteryProgress = activityData[:bodyBatteryProgress];
-        var currentHR = activityData[:hr];
-        var hrProgress = activityData[:hrProgress];
-
         // Get configured data sources
         var outerType = Settings.getOuterRing();
         var middleType = Settings.getMiddleRing();
@@ -951,20 +998,20 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         // Draw outer ring
         if (outerType != 4) {
-            var outerData = getRingData(outerType, stepsProgress, floorsProgress, bodyBatteryProgress, hrProgress);
-            drawRingWithOverflow(dc, ringsX, ringsY, outerR, stroke, outerData[:progress], Theme.getRingColor(outerType));
+            drawRingWithOverflow(dc, ringsX, ringsY, outerR, stroke,
+                getRingProgress(outerType), Theme.getRingColor(outerType));
         }
 
         // Draw middle ring (only if layout is "All 3")
         if (ringLayout == 0 && middleType != 4) {
-            var middleData = getRingData(middleType, stepsProgress, floorsProgress, bodyBatteryProgress, hrProgress);
-            drawRingWithOverflow(dc, ringsX, ringsY, middleR, stroke, middleData[:progress], Theme.getRingColor(middleType));
+            drawRingWithOverflow(dc, ringsX, ringsY, middleR, stroke,
+                getRingProgress(middleType), Theme.getRingColor(middleType));
         }
 
         // Draw inner ring (only if layout is "All 3")
         if (ringLayout == 0 && innerType != 4) {
-            var innerData = getRingData(innerType, stepsProgress, floorsProgress, bodyBatteryProgress, hrProgress);
-            drawRingWithOverflow(dc, ringsX, ringsY, innerR, stroke, innerData[:progress], Theme.getRingColor(innerType));
+            drawRingWithOverflow(dc, ringsX, ringsY, innerR, stroke,
+                getRingProgress(innerType), Theme.getRingColor(innerType));
         }
 
         // Icons to the right of rings
@@ -993,20 +1040,20 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         if (cycleIndex == 0) {
             // Steps
-            centerValue = currentSteps;
+            centerValue = _currentSteps;
             centerColor = Theme.STEPS_RING;
         } else if (cycleIndex == 1) {
             // Heart Rate
-            centerValue = currentHR;
+            centerValue = _currentHR;
             centerColor = Theme.HR_RING;
-            if (currentHR <= 0) { showDash = true; }
+            if (_currentHR <= 0) { showDash = true; }
         } else if (cycleIndex == 2) {
             // Floors
-            centerValue = currentFloors;
+            centerValue = _currentFloors;
             centerColor = Theme.FLOORS_RING;
         } else {
             // Body Battery
-            centerValue = bodyBattery;
+            centerValue = _bodyBattery;
             centerColor = Theme.BODY_BATTERY_RING;
         }
 
@@ -1024,62 +1071,74 @@ class WatchFaceView extends WatchUi.WatchFace {
     private function drawCycleIndicator(dc, centerX, y, activeIndex) {
         var dotSpacing = 8;
         var startX = centerX - (dotSpacing * 1.5).toNumber();
-        var colors = [Theme.STEPS_RING, Theme.HR_RING, Theme.FLOORS_RING, Theme.BODY_BATTERY_RING];
 
         for (var i = 0; i < 4; i++) {
             var dotX = startX + (i * dotSpacing);
+            var color = getCycleColor(i);
             if (i == activeIndex) {
-                dc.setColor(colors[i], Graphics.COLOR_TRANSPARENT);
+                dc.setColor(color, Graphics.COLOR_TRANSPARENT);
                 dc.fillCircle(dotX, y, 3);
             } else {
-                dc.setColor(Theme.dimColor(colors[i], 0.3), Graphics.COLOR_TRANSPARENT);
+                dc.setColor(Theme.dimColor(color, 0.3), Graphics.COLOR_TRANSPARENT);
                 dc.fillCircle(dotX, y, 2);
             }
         }
     }
 
-    // Get activity data without capping progress at 1.0 (for overflow display)
-    private function getActivityDataRaw() {
-        var currentSteps = 0;
-        var stepsProgress = 0.0;
-        var currentFloors = 0;
-        var floorsProgress = 0.0;
-        var bodyBattery = 0;
-        var bodyBatteryProgress = 0.0;
-        var currentHR = 0;
-        var hrProgress = 0.0;
+    private function getCycleColor(index) {
+        switch (index) {
+            case 0: return Theme.STEPS_RING;
+            case 1: return Theme.HR_RING;
+            case 2: return Theme.FLOORS_RING;
+            default: return Theme.BODY_BATTERY_RING;
+        }
+    }
+
+    // Read each activity source once, then reuse the snapshot for every
+    // renderer in this update.
+    private function refreshActivityData() {
+        _currentSteps = 0;
+        _stepsProgress = 0.0;
+        _currentFloors = 0;
+        _floorsProgress = 0.0;
+        _bodyBattery = 0;
+        _bodyBatteryProgress = 0.0;
+        _currentHR = 0;
+        _hrProgress = 0.0;
+        _moveBarLevel = 0;
 
         if (DEBUG_SIMULATOR) {
-            currentSteps = DEBUG_STEPS;
-            stepsProgress = DEBUG_STEPS.toFloat() / DEBUG_STEP_GOAL.toFloat();
+            _currentSteps = DEBUG_STEPS;
+            _stepsProgress = DEBUG_STEPS.toFloat() / DEBUG_STEP_GOAL.toFloat();
             // Don't cap - allow overflow
 
-            currentFloors = DEBUG_FLOORS;
-            floorsProgress = DEBUG_FLOORS.toFloat() / DEBUG_FLOOR_GOAL.toFloat();
+            _currentFloors = DEBUG_FLOORS;
+            _floorsProgress = DEBUG_FLOORS.toFloat() / DEBUG_FLOOR_GOAL.toFloat();
             // Don't cap - allow overflow
 
-            bodyBattery = DEBUG_BODY_BATTERY;
-            bodyBatteryProgress = bodyBattery / 100.0;
+            _bodyBattery = DEBUG_BODY_BATTERY;
+            _bodyBatteryProgress = _bodyBattery / 100.0;
 
-            currentHR = DEBUG_HR;
-            hrProgress = (currentHR - 40).toFloat() / 160.0;
-            if (hrProgress < 0.0) { hrProgress = 0.0; }
+            _currentHR = DEBUG_HR;
+            _hrProgress = (_currentHR - 40).toFloat() / 160.0;
+            if (_hrProgress < 0.0) { _hrProgress = 0.0; }
+            _moveBarLevel = DEBUG_MOVE_BAR;
         } else {
             // Get Heart Rate
             var activityInfo = Activity.getActivityInfo();
             if (activityInfo != null && activityInfo.currentHeartRate != null) {
-                currentHR = activityInfo.currentHeartRate;
+                _currentHR = activityInfo.currentHeartRate;
             } else {
                 var hrIterator = ActivityMonitor.getHeartRateHistory(1, true);
                 if (hrIterator != null) {
                     var hrSample = hrIterator.next();
                     if (hrSample != null && hrSample.heartRate != null && hrSample.heartRate != ActivityMonitor.INVALID_HR_SAMPLE) {
-                        currentHR = hrSample.heartRate;
+                        _currentHR = hrSample.heartRate;
                     }
                 }
             }
-            hrProgress = (currentHR - 40).toFloat() / 160.0;
-            if (hrProgress < 0.0) { hrProgress = 0.0; }
+            _hrProgress = (_currentHR - 40).toFloat() / 160.0;
+            if (_hrProgress < 0.0) { _hrProgress = 0.0; }
 
             // Get Body Battery
             if (Toybox has :SensorHistory && SensorHistory has :getBodyBatteryHistory) {
@@ -1087,8 +1146,8 @@ class WatchFaceView extends WatchUi.WatchFace {
                 if (bbIterator != null) {
                     var bbSample = bbIterator.next();
                     if (bbSample != null && bbSample.data != null) {
-                        bodyBattery = bbSample.data.toNumber();
-                        bodyBatteryProgress = bodyBattery / 100.0;
+                        _bodyBattery = bbSample.data.toNumber();
+                        _bodyBatteryProgress = _bodyBattery / 100.0;
                     }
                 }
             }
@@ -1096,44 +1155,37 @@ class WatchFaceView extends WatchUi.WatchFace {
             var actInfo = ActivityMonitor.getInfo();
             if (actInfo != null) {
                 if (actInfo.steps != null) {
-                    currentSteps = actInfo.steps;
+                    _currentSteps = actInfo.steps;
                 }
                 if (actInfo.stepGoal != null && actInfo.stepGoal > 0) {
-                    stepsProgress = currentSteps.toFloat() / actInfo.stepGoal.toFloat();
+                    _stepsProgress = _currentSteps.toFloat() / actInfo.stepGoal.toFloat();
                     // Don't cap - allow overflow
                 }
 
                 if (actInfo.floorsClimbed != null) {
-                    currentFloors = actInfo.floorsClimbed;
+                    _currentFloors = actInfo.floorsClimbed;
                 }
                 var floorGoal = 10;
                 if (actInfo.floorsClimbedGoal != null && actInfo.floorsClimbedGoal > 0) {
                     floorGoal = actInfo.floorsClimbedGoal;
                 }
-                floorsProgress = currentFloors.toFloat() / floorGoal.toFloat();
+                _floorsProgress = _currentFloors.toFloat() / floorGoal.toFloat();
                 // Don't cap - allow overflow
+
+                if (actInfo.moveBarLevel != null) {
+                    _moveBarLevel = actInfo.moveBarLevel;
+                }
             }
         }
-
-        return {
-            :steps => currentSteps,
-            :stepsProgress => stepsProgress,
-            :floors => currentFloors,
-            :floorsProgress => floorsProgress,
-            :bodyBattery => bodyBattery,
-            :bodyBatteryProgress => bodyBatteryProgress,
-            :hr => currentHR,
-            :hrProgress => hrProgress
-        };
     }
 
-    private function getRingData(dataType, stepsProgress, floorsProgress, bodyBatteryProgress, hrProgress) {
+    private function getRingProgress(dataType) {
         switch (dataType) {
-            case 0: return { :progress => stepsProgress };
-            case 1: return { :progress => floorsProgress };
-            case 2: return { :progress => bodyBatteryProgress };
-            case 3: return { :progress => hrProgress };
-            default: return { :progress => 0.0 };
+            case 0: return _stepsProgress;
+            case 1: return _floorsProgress;
+            case 2: return _bodyBatteryProgress;
+            case 3: return _hrProgress;
+            default: return 0.0;
         }
     }
 
@@ -1151,16 +1203,15 @@ class WatchFaceView extends WatchUi.WatchFace {
         var ringsY = 370;
         var tzX = center + 80;
         var clockTime = System.getClockTime();
-        var localOffset = clockTime.timeZoneOffset / 3600;
 
         var labelX = tzX - 80;
         var timeX = tzX - 15;
 
         if (count >= 1) {
             var tz1Name = Settings.getTimezone1Name();
-            var tz1Offset = Settings.getTimezone1Offset();
-            var tz1Hour = (clockTime.hour - localOffset + tz1Offset + 48) % 24;
-            var tz1Min = clockTime.min;
+            var tz1Minutes = getWorldClockTotalMinutes(clockTime, Settings.getTimezone1OffsetMinutes());
+            var tz1Hour = (tz1Minutes / 60).toNumber();
+            var tz1Min = (tz1Minutes % 60).toNumber();
 
             var tzY1 = count >= 2 ? ringsY - 41 : ringsY - 21;
 
@@ -1172,9 +1223,9 @@ class WatchFaceView extends WatchUi.WatchFace {
 
         if (count >= 2) {
             var tz2Name = Settings.getTimezone2Name();
-            var tz2Offset = Settings.getTimezone2Offset();
-            var tz2Hour = (clockTime.hour - localOffset + tz2Offset + 48) % 24;
-            var tz2Min = clockTime.min;
+            var tz2Minutes = getWorldClockTotalMinutes(clockTime, Settings.getTimezone2OffsetMinutes());
+            var tz2Hour = (tz2Minutes / 60).toNumber();
+            var tz2Min = (tz2Minutes % 60).toNumber();
 
             var tzY2 = ringsY - 1;
 
@@ -1183,6 +1234,20 @@ class WatchFaceView extends WatchUi.WatchFace {
             dc.setColor(Theme.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(timeX, tzY2, Graphics.FONT_XTINY, tz2Hour.format("%02d") + ":" + tz2Min.format("%02d"), Graphics.TEXT_JUSTIFY_LEFT);
         }
+    }
+
+    private function getWorldClockTotalMinutes(clockTime, targetOffsetMinutes) {
+        var totalMinutes = (clockTime.hour * 60) + clockTime.min -
+            Settings.getCachedLocalOffsetMinutes() + targetOffsetMinutes;
+
+        while (totalMinutes < 0) {
+            totalMinutes += 1440;
+        }
+        while (totalMinutes >= 1440) {
+            totalMinutes -= 1440;
+        }
+
+        return totalMinutes;
     }
 
     // Mini-digit renderer: draws 8x10 pixel digits
@@ -1459,21 +1524,11 @@ class WatchFaceView extends WatchUi.WatchFace {
     private function drawMoveBar(dc) {
         if (Theme.isMIPDisplay) { return; }
 
-        var moveBarLevel = 0;
-        if (DEBUG_SIMULATOR) {
-            moveBarLevel = DEBUG_MOVE_BAR;
-        } else {
-            var actInfo = ActivityMonitor.getInfo();
-            if (actInfo != null && actInfo.moveBarLevel != null) {
-                moveBarLevel = actInfo.moveBarLevel;
-            }
-        }
-
-        if (moveBarLevel <= 0) { return; }
+        if (_moveBarLevel <= 0) { return; }
 
         var center = Theme.getCenter();
         var radius = center - 2;
-        var halfSpread = moveBarLevel * 36;
+        var halfSpread = _moveBarLevel * 36;
 
         dc.setPenWidth(3);
         dc.setColor(0xC62828, Graphics.COLOR_TRANSPARENT);
@@ -1500,10 +1555,9 @@ class WatchFaceView extends WatchUi.WatchFace {
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         var now = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
-        var dayNames = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
         dc.setColor(Theme.AOD_TEXT, Graphics.COLOR_TRANSPARENT);
         dc.drawText(center, Theme.screenHeight / 2 + 45, Graphics.FONT_XTINY,
-            dayNames[now.day_of_week - 1] + " " + now.day,
+            AOD_DAY_NAMES[now.day_of_week - 1] + " " + now.day,
             Graphics.TEXT_JUSTIFY_CENTER);
 
         if (Settings.shouldShowBattery(System.getSystemStats().battery.toNumber())) {
