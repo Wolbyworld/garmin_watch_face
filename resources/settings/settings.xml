@@ -34,7 +34,7 @@
         <setting propertyKey="@Properties.timezone1" title="@Strings.timezone1">
             <settingConfig type="list">
                 <listEntry value="0">@Strings.cityNYC</listEntry>
-                <listEntry value="1">@Strings.cityLAX</listEntry>
+                <listEntry value="1">@Strings.citySFO</listEntry>
                 <listEntry value="2">@Strings.cityCHI</listEntry>
                 <listEntry value="3">@Strings.cityDEN</listEntry>
                 <listEntry value="4">@Strings.citySAO</listEntry>
@@ -63,7 +63,7 @@
         <setting propertyKey="@Properties.timezone2" title="@Strings.timezone2">
             <settingConfig type="list">
                 <listEntry value="0">@Strings.cityNYC</listEntry>
-                <listEntry value="1">@Strings.cityLAX</listEntry>
+                <listEntry value="1">@Strings.citySFO</listEntry>
                 <listEntry value="2">@Strings.cityCHI</listEntry>
                 <listEntry value="3">@Strings.cityDEN</listEntry>
                 <listEntry value="4">@Strings.citySAO</listEntry>

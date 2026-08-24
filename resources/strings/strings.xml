@@ -31,7 +31,7 @@
 
     <!-- City Names -->
     <string id="cityNYC">New York</string>
-    <string id="cityLAX">Los Angeles</string>
+    <string id="citySFO">San Francisco</string>
     <string id="cityCHI">Chicago</string>
     <string id="cityDEN">Denver</string>
     <string id="citySAO">Sao Paulo</string>
